@@ -72,12 +72,14 @@ mkdir -p "$configdirectory"/delugevpn
 mkdir -p "$configdirectory"/delugevpn/config/openvpn
 mkdir -p "$configdirectory"/duplicati
 mkdir -p "$configdirectory"/duplicati/backups
+mkdir -p "$configdirectory"/jackett
 mkdir -p "$configdirectory"/ombi
 mkdir -p "$configdirectory/plex/Library/Application Support/Plex Media Server/Logs"
 mkdir -p "$configdirectory"/plexpy
 mkdir -p "$configdirectory"/portainer
 mkdir -p "$configdirectory"/radarr
 mkdir -p "$configdirectory"/sickrage
+mkdir -p "$configdirectory"/sonarr
 mkdir -p "$configdirectory"/www
 # Move the PIA VPN files
 mv ca.ovpn "$configdirectory"/delugevpn/config/openvpn/ca.ovpn
