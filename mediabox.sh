@@ -8,10 +8,14 @@ PUID=`id -u $localuname`
 PGID=`id -g $localuname`
 # Get Hostname
 thishost=`hostname`
-# Get IP Address
-locip=`hostname -I | awk '{print $1}'`
-# Get Time Zone
-time_zone=`cat /etc/timezone`
+# Get IP Address and Time Zone
+if [ `uname` == 'Darwin' ]; then
+    locip=`(ifconfig en0 || ifconfig en1) | grep 'inet ' | awk '{print $2}'`
+    time_zone=`ls -l /etc/localtime | sed -E 's/.*zoneinfo\/(.*)$/\1/'`
+else
+    locip=`hostname -I | awk '{print $1}'`
+    time_zone=`cat /etc/timezone`
+fi
 
 # CIDR - this assumes a 255.255.255.0 netmask - If your config is different use the custom CIDR line
 lannet=`echo $locip | sed 's/\.[0-9]*$/.0\/24/'`
