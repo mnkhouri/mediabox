@@ -33,9 +33,9 @@ services:
             - PUID=${PUID}
             - PGID=${PGID}
         volumes:
-            - './couchpotato:/config'
-            - './content/completed:/downloads'
-            - './content/movies:/movies'
+            - '${CONFIGDIRECTORY}/couchpotato:/config'
+            - '${MEDIADIRECTORY}/completed:/downloads'
+            - '${MEDIADIRECTORY}/movies:/movies'
             - '/etc/localtime:/etc/localtime:ro'
 
     # ----------------------------------------
@@ -70,8 +70,8 @@ services:
             - PUID=${PUID}
             - PGID=${PGID}
         volumes:
-            - './content:/data'
-            - './delugevpn/config:/config'
+            - '${MEDIADIRECTORY}:/data'
+            - '${CONFIGDIRECTORY}/delugevpn/config:/config'
             - '/etc/localtime:/etc/localtime:ro'
 
     # ----------------------------------------
@@ -88,9 +88,9 @@ services:
             - PUID=${PUID}
             - PGID=${PGID}
         volumes:
-            - './duplicati:/config'
-            - './duplicati/backups:/backups'
-            - '${PWD}:/source'
+            - '${CONFIGDIRECTORY}/duplicati:/config'
+            - '${CONFIGDIRECTORY}/duplicati/backups:/backups'
+            - '${CONFIGDIRECTORY}:/source'
             - '/etc/localtime:/etc/localtime:ro'
 
     # ----------------------------------------
@@ -107,7 +107,7 @@ services:
             - PUID=${PUID}
             - PGID=${PGID}
         volumes:
-            - './www:/www'
+            - '${CONFIGDIRECTORY}/www:/www'
 
     # ----------------------------------------
     # MINIO
@@ -123,7 +123,7 @@ services:
             - MINIO_ACCESS_KEY=minio
             - MINIO_SECRET_KEY=minio123
         volumes:
-            - '${PWD}:/export'
+            - '${MEDIADIRECTORY}:/export'
         command: server /export
 
     # ----------------------------------------
@@ -157,7 +157,8 @@ services:
             - PUID=${PUID}
             - PGID=${PGID}
         volumes:
-            - './ombi:/config'
+            - '${CONFIGDIRECTORY}/ombi:/config'
+            - '${MEDIADIRECTORY}:/data'
 
     # ----------------------------------------
     # PLEX
@@ -181,14 +182,14 @@ services:
             - PLEX_CLAIM=${PMSTOKEN}
             - ADVERTISE_IP=http://${IP_ADDRESS}:32400/
             - ALLOWED_NETWORKS=${CIDR_ADDRESS}
-            - PLEX_UID=${PUID} 
+            - PLEX_UID=${PUID}
             - PLEX_GID=${PGID}
         hostname: ${HOSTNAME}
         volumes:
-            - './plex:/config'
-            - './plex/transcode:/transcode'
-            - './content/tv:/data/tvshows'
-            - './content/movies:/data/movies'
+            - '${CONFIGDIRECTORY}/plex:/config'
+            - '${CONFIGDIRECTORY}/plex/transcode:/transcode'
+            - '${MEDIADIRECTORY}/tv:/data/tvshows'
+            - '${MEDIADIRECTORY}/movies:/data/movies'
             - '/etc/localtime:/etc/localtime:ro'
 
     # ----------------------------------------
@@ -205,8 +206,8 @@ services:
             - PUID=${PUID}
             - PGID=${PGID}
         volumes:
-            - './plexpy:/config'
-            - './plex/Library/Application Support/Plex Media Server/Logs:/logs:ro'
+            - '${CONFIGDIRECTORY}/plexpy:/config'
+            - '${CONFIGDIRECTORY}/plex/Library/Application Support/Plex Media Server/Logs:/logs:ro'
             - '/etc/localtime:/etc/localtime:ro'
         depends_on:
             - plex
@@ -225,7 +226,7 @@ services:
             - PUID=${PUID}
             - PGID=${PGID}
         volumes:
-            - './portainer:/data'
+            - '${CONFIGDIRECTORY}/portainer:/data'
             - '/var/run/docker.sock:/var/run/docker.sock'
             - '/etc/localtime:/etc/localtime:ro'
         command: ${PORTAINERSTYLE} -H unix:///var/run/docker.sock
@@ -244,9 +245,8 @@ services:
             - PUID=${PUID}
             - PGID=${PGID}
         volumes:
-            - './radarr:/config'
-            - './content/completed:/downloads'
-            - './content/movies:/movies'
+            - '${CONFIGDIRECTORY}/radarr:/config'
+            - '${MEDIADIRECTORY}:/data'
             - '/etc/localtime:/etc/localtime:ro'
     
     # ----------------------------------------
@@ -263,9 +263,9 @@ services:
             - PUID=${PUID}
             - PGID=${PGID}
         volumes:
-            - './sickrage:/config'
-            - './content/completed:/downloads'
-            - './content/tv:/tv'
+            - '${CONFIGDIRECTORY}/sickrage:/config'
+            - '${MEDIADIRECTORY}/completed:/downloads'
+            - '${MEDIADIRECTORY}/tv:/tv'
             - '/etc/localtime:/etc/localtime:ro'
 
     # ----------------------------------------

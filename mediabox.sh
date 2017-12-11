@@ -42,27 +42,43 @@ elif [ $portainerstyle == "auth" ]; then
    portainerstyle= 
 fi   
 
+# Get the desired directory for media storage
+read -p "Where do you want to store media? By default './content' will be used: " mediadirectory
+if [ -z "$mediadirectory" ]; then
+   mediadirectory='./content'
+fi
+# If the user entered '~' in the path, replace it with '$HOME' so it gets properly expanded
+mediadirectory="${mediadirectory/#\~/$HOME}"
+
+# Get the desired directory for media storage
+read -p "Where do you want to store configuation data? By default '.' (this directory) will be used: " configdirectory
+if [ -z "$configdirectory" ]; then
+   configdirectory='.'
+fi
+# If the user entered '~' in the path, replace it with '$HOME' so it gets properly expanded
+configdirectory="${configdirectory/#\~/$HOME}"
+
 # Create the directory structure
-mkdir -p content/completed
-mkdir -p content/incomplete
-mkdir -p content/movies
-mkdir -p content/tv
-mkdir -p couchpotato
-mkdir -p delugevpn
-mkdir -p delugevpn/config/openvpn
-mkdir -p duplicati
-mkdir -p duplicati/backups
-mkdir -p ombi
-mkdir -p "plex/Library/Application Support/Plex Media Server/Logs"
-mkdir -p plexpy
-mkdir -p portainer
-mkdir -p radarr
-mkdir -p sickrage
-mkdir -p www
+mkdir -p "$mediadirectory"/completed
+mkdir -p "$mediadirectory"/incomplete
+mkdir -p "$mediadirectory"/movies
+mkdir -p "$mediadirectory"/tv
+mkdir -p "$configdirectory"/couchpotato
+mkdir -p "$configdirectory"/delugevpn
+mkdir -p "$configdirectory"/delugevpn/config/openvpn
+mkdir -p "$configdirectory"/duplicati
+mkdir -p "$configdirectory"/duplicati/backups
+mkdir -p "$configdirectory"/ombi
+mkdir -p "$configdirectory/plex/Library/Application Support/Plex Media Server/Logs"
+mkdir -p "$configdirectory"/plexpy
+mkdir -p "$configdirectory"/portainer
+mkdir -p "$configdirectory"/radarr
+mkdir -p "$configdirectory"/sickrage
+mkdir -p "$configdirectory"/www
 # Move the PIA VPN files
-mv ca.ovpn delugevpn/config/openvpn/ca.ovpn > /dev/null 2>&1
-mv ca.rsa.2048.crt delugevpn/config/openvpn/ca.rsa.2048.crt > /dev/null 2>&1
-mv crl.rsa.2048.pem delugevpn/config/openvpn/crl.rsa.2048.pem > /dev/null 2>&1
+mv ca.ovpn "$configdirectory"/delugevpn/config/openvpn/ca.ovpn
+mv ca.rsa.2048.crt "$configdirectory"/delugevpn/config/openvpn/ca.rsa.2048.crt
+mv crl.rsa.2048.pem "$configdirectory"/delugevpn/config/openvpn/crl.rsa.2048.pem
 
 ###################
 # TROUBLESHOOTING #
@@ -74,10 +90,9 @@ mv crl.rsa.2048.pem delugevpn/config/openvpn/crl.rsa.2048.pem > /dev/null 2>&1
 # printf "### Collected Variables are echoed below. ###\n"
 # printf "\n"
 # printf "The username is: $localuname\n"
+# printf "The IP address is: $locip\n"
 # printf "The PUID is: $PUID\n"
 # printf "The PGID is: $PGID\n"
-# printf "The current directory is: $PWD\n"
-# printf "The IP address is: $locip\n"
 # printf "The CIDR address is: $lannet\n"
 # printf "The PIA Username is: $piauname\n"
 # printf "The PIA Password is: $piapass\n"
@@ -87,6 +102,8 @@ mv crl.rsa.2048.pem delugevpn/config/openvpn/crl.rsa.2048.pem > /dev/null 2>&1
 # printf "The Plexpass Claim token is: $pmstoken\n"
 # printf "The Portainer style is: $portainerstyle\n"
 # printf "Note: A Portainer style of 'blank' = the 'Normal Auth' style\n"
+# printf "The Media Directory is: $mediadirectory\n"
+# printf "The Data/Config Directory is: $configdirectory\n"
 
 # Create the .env file
 echo "Creating the .env file with the values we have gathered"
@@ -96,14 +113,15 @@ echo "HOSTNAME=$thishost" >> .env
 echo "IP_ADDRESS=$locip" >> .env
 echo "PUID=$PUID" >> .env
 echo "PGID=$PGID" >> .env
-echo "PWD=$PWD" >> .env
+echo "CIDR_ADDRESS=$lannet" >> .env
 echo "PIAUNAME=$piauname" >> .env
 echo "PIAPASS=$piapass" >> .env
-echo "CIDR_ADDRESS=$lannet" >> .env
 echo "TZ=$time_zone" >> .env
 echo "PMSTAG=$pmstag" >> .env
 echo "PMSTOKEN=$pmstoken" >> .env
 echo "PORTAINERSTYLE=$portainerstyle" >> .env
+echo "MEDIADIRECTORY=$mediadirectory" >> .env
+echo "CONFIGDIRECTORY=$configdirectory" >> .env
 echo ".env file creation complete"
 printf "\n\n"
 
@@ -125,30 +143,30 @@ printf "\n\n"
 printf "Configuring Deluge daemon access - UHTTPD index file - Permissions \n\n"
 
 # Configure DelugeVPN: Set Daemon access on, delete the core.conf~ file
-while [ ! -f delugevpn/config/core.conf ]; do sleep 1; done
+while [ ! -f "$configdirectory"/delugevpn/config/core.conf ]; do sleep 1; done
 docker stop delugevpn > /dev/null 2>&1
-rm delugevpn/config/core.conf~ > /dev/null 2>&1
-perl -i -pe 's/"allow_remote": false,/"allow_remote": true,/g'  delugevpn/config/core.conf
-perl -i -pe 's/"move_completed": false,/"move_completed": true,/g'  delugevpn/config/core.conf
+rm -f "$configdirectory"/delugevpn/config/core.conf~ > /dev/null 2>&1
+perl -i -pe 's/"allow_remote": false,/"allow_remote": true,/g'  "$configdirectory"/delugevpn/config/core.conf
+perl -i -pe 's/"move_completed": false,/"move_completed": true,/g'  "$configdirectory"/delugevpn/config/core.conf
 docker start delugevpn > /dev/null 2>&1
 
 # Push the Deluge Daemon Access info the to Auth file
-echo $daemonun:$daemonpass:10 >> ./delugevpn/config/auth
+echo $daemonun:$daemonpass:10 >> "$configdirectory"/delugevpn/config/auth
 
 # Configure UHTTPD settings and Index file
 docker stop uhttpd > /dev/null 2>&1
-mv index.html www/index.html
-perl -i -pe "s/locip/$locip/g" www/index.html
-perl -i -pe "s/daemonun/$daemonun/g" www/index.html
-perl -i -pe "s/daemonpass/$daemonpass/g" www/index.html
-cp .env www/env.txt
+cp index.html "$configdirectory"/www/index.html
+perl -i -pe "s/locip/$locip/g" "$configdirectory"/www/index.html
+perl -i -pe "s/daemonun/$daemonun/g" "$configdirectory"/www/index.html
+perl -i -pe "s/daemonpass/$daemonpass/g" "$configdirectory"/www/index.html
+cp .env "$configdirectory"/www/env.txt
 docker start uhttpd > /dev/null 2>&1
 
 # Fix the Healthcheck in Minio
 docker exec minio sed -i "s/404/403/g" /usr/bin/healthcheck.sh
 
-# Adjust the permissions on the content folder
-chmod -R 0777 content/
+# Adjust the permissions on the media folder
+chmod -R 0777 "$mediadirectory"
 
 printf "Setup Complete - Open a browser and go to: \n\n"
 printf "http://$locip OR http://$thishost \n"
