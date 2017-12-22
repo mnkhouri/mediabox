@@ -32,8 +32,8 @@ printf "\n\n"
 read -p "Which PLEX release do you want to run? By default 'public' will be used. (latest, public, plexpass): " pmstag
 read -p "If you have PLEXPASS what is your Claim Token from https://www.plex.tv/claim/ (Optional): " pmstoken
 # If not set - set PMS Tag to Public:
-if [ -z "$pmstag" ]; then 
-   pmstag=public 
+if [ -z "$pmstag" ]; then
+   pmstag=public
 fi
 
 # Get the info for the style of Portainer to use
@@ -43,8 +43,8 @@ if [ -z "$portainerstyle" ]; then
 elif [ $portainerstyle == "noauth" ]; then
    portainerstyle=--no-auth
 elif [ $portainerstyle == "auth" ]; then
-   portainerstyle= 
-fi   
+   portainerstyle=
+fi
 
 # Get the desired directory for media storage
 read -p "Where do you want to store media? By default './content' will be used: " mediadirectory
@@ -67,6 +67,7 @@ mkdir -p "$mediadirectory"/completed
 mkdir -p "$mediadirectory"/incomplete
 mkdir -p "$mediadirectory"/movies
 mkdir -p "$mediadirectory"/tv
+mkdir -p "$configdirectory"/authproxy
 mkdir -p "$configdirectory"/couchpotato
 mkdir -p "$configdirectory"/delugevpn
 mkdir -p "$configdirectory"/delugevpn/config/openvpn
