@@ -22,73 +22,113 @@ services:
     # ----------------------------------------
     # COUCHPOTATO
     # ----------------------------------------
-    couchpotato:
-        image: linuxserver/couchpotato
-        container_name: couchpotato
-        restart: unless-stopped
-        ports:
-            - '${IP_ADDRESS}:5050:5050'
-        environment:
-            - PUID=${PUID}
-            - PGID=${PGID}
-        volumes:
-            - '${CONFIGDIRECTORY}/couchpotato:/config'
-            - '${MEDIADIRECTORY}/completed:/downloads'
-            - '${MEDIADIRECTORY}/movies:/movies'
-            - '/etc/localtime:/etc/localtime:ro'
+    #couchpotato:
+    #    image: linuxserver/couchpotato
+    #    container_name: couchpotato
+    #    restart: unless-stopped
+    #    ports:
+    #        - '${IP_ADDRESS}:5050:5050'
+    #    environment:
+    #        - PUID=${PUID}
+    #        - PGID=${PGID}
+    #    volumes:
+    #        - '${CONFIGDIRECTORY}/couchpotato:/config'
+    #        - '${MEDIADIRECTORY}/completed:/downloads'
+    #        - '${MEDIADIRECTORY}/movies:/movies'
 
     # ----------------------------------------
     # DELUGEVPN
     # ----------------------------------------
-    arch-delugevpn:
-        image: binhex/arch-delugevpn
-        container_name: delugevpn
+    #arch-delugevpn:
+    #    image: binhex/arch-delugevpn
+    #    container_name: delugevpn
+    #    restart: unless-stopped
+    #    ports:
+    #        - '${IP_ADDRESS}:8112:8112'
+    #        - '${IP_ADDRESS}:8118:8118'
+    #        - '${IP_ADDRESS}:58846:58846'
+    #        - '${IP_ADDRESS}:58946:58946'
+    #    cap_add:
+    #        - NET_ADMIN
+    #    environment:
+    #        - VPN_ENABLED=yes
+    #        - VPN_USER=${PIAUNAME}
+    #        - VPN_PASS=${PIAPASS}
+    #        - VPN_REMOTE=ca.privateinternetaccess.com
+    #        - VPN_PORT=1198
+    #        - VPN_PROTOCOL=udp
+    #        - VPN_DEVICE_TYPE=tun
+    #        - VPN_PROV=pia
+    #        - STRONG_CERTS=no
+    #        - ENABLE_PRIVOXY=yes
+    #        - LAN_NETWORK=${CIDR_ADDRESS}
+    #        - NAME_SERVERS=209.222.18.222,37.235.1.174,8.8.8.8,209.222.18.218,37.235.1.177,8.8.4.4
+    #        - DEBUG=false
+    #        - PUID=${PUID}
+    #        - PGID=${PGID}
+    #    volumes:
+    #        - '${MEDIADIRECTORY}:/data'
+    #        - '${CONFIGDIRECTORY}/delugevpn/config:/config'
+
+    # ----------------------------------------
+    # TRANSMISSION
+    # ----------------------------------------
+    transmission-openvpn:
+        image: haugene/transmission-openvpn
+        container_name: transmission
         restart: unless-stopped
+        devices:
+            - '/dev/net/tun:/dev/net/tun'
         ports:
-            - '${IP_ADDRESS}:8112:8112'
-            - '${IP_ADDRESS}:8118:8118'
-            - '${IP_ADDRESS}:58846:58846'
-            - '${IP_ADDRESS}:58946:58946'
+            - '${IP_ADDRESS}:9091:9091'
         cap_add:
             - NET_ADMIN
+        dns:
+            - 8.8.8.8
+            - 8.8.4.4
         environment:
-            - VPN_ENABLED=yes
-            - VPN_USER=${PIAUNAME}
-            - VPN_PASS=${PIAPASS}
-            - VPN_REMOTE=ca.privateinternetaccess.com
-            - VPN_PORT=1198
-            - VPN_PROTOCOL=udp
-            - VPN_DEVICE_TYPE=tun
-            - VPN_PROV=pia
-            - STRONG_CERTS=no
-            - ENABLE_PRIVOXY=yes
-            - LAN_NETWORK=${CIDR_ADDRESS}
-            - NAME_SERVERS=209.222.18.222,37.235.1.174,8.8.8.8,209.222.18.218,37.235.1.177,8.8.4.4
-            - DEBUG=false
+            - OPENVPN_PROVIDER=PIA
+            - OPENVPN_USERNAME=${PIAUNAME}
+            - OPENVPN_PASSWORD=${PIAPASS}
+            - 'OPENVPN_CONFIG=CA Toronto'
+            - ENABLE_UFW=true
+            - LOCAL_NETWORK=${CIDR_ADDRESS}
+            - 'OPENVPN_OPTS=--inactive 3600 --ping 10 --ping-exit 60'
             - PUID=${PUID}
             - PGID=${PGID}
+            - TRANSMISSION_DOWNLOAD_QUEUE_SIZE=20
+            - TRANSMISSION_QUEUE_STALLED_MINUTES=10
+            - TRANSMISSION_PREALLOCATION=2
+            - TRANSMISSION_ALT_SPEED_TIME_ENABLED=true
+            - TRANSMISSION_ALT_SPEED_TIME_BEGIN=780
+            - TRANSMISSION_ALT_SPEED_TIME_END=240
+            - TRANSMISSION_ALT_SPEED_UP=0
+            - TRANSMISSION_ALT_SPEED_DOWN=0
+            - TRANSMISSION_SPEED_LIMIT_UP=6250
+            - TRANSMISSION_SPEED_LIMIT_UP_ENABLED=true
+            - TRANSMISSION_SPEED_LIMIT_DOWN=10000
+            - TRANSMISSION_SPEED_LIMIT_DOWN_ENABLED=true
+            - TRANSMISSION_UPLOAD_SLOTS_PER_TORRENT=10
+            - TRANSMISSION_PEER_LIMIT_GLOBAL=200
         volumes:
             - '${MEDIADIRECTORY}:/data'
-            - '${CONFIGDIRECTORY}/delugevpn/config:/config'
-            - '/etc/localtime:/etc/localtime:ro'
 
     # ----------------------------------------
     # DUPLICATI
     # ----------------------------------------
-    duplicati:
-        image: linuxserver/duplicati
-        container_name: duplicati
-        restart: unless-stopped
-        ports:
-            - '${IP_ADDRESS}:8200:8200'
-        environment:
-            - PUID=${PUID}
-            - PGID=${PGID}
-        volumes:
-            - '${CONFIGDIRECTORY}/duplicati:/config'
-            - '${CONFIGDIRECTORY}/duplicati/backups:/backups'
-            - '${CONFIGDIRECTORY}:/source'
-            - '/etc/localtime:/etc/localtime:ro'
+    #duplicati:
+    #    image: linuxserver/duplicati
+    #    container_name: duplicati
+    #    restart: unless-stopped
+    #    ports:
+    #        - '${IP_ADDRESS}:8200:8200'
+    #    environment:
+    #        - PUID=${PUID}
+    #        - PGID=${PGID}
+    #    volumes:
+    #        - '${CONFIGDIRECTORY}/duplicati:/config'
+    #        - '${CONFIGDIRECTORY}/duplicati/backups:/backups'
+    #        - '${CONFIGDIRECTORY}:/source'
 
     # ----------------------------------------
     # HTTP
@@ -97,8 +137,8 @@ services:
         image: fnichol/uhttpd
         container_name: uhttpd
         restart: unless-stopped
-        #ports:
-            #- '${IP_ADDRESS}:80:80'
+        ports:
+            - '${IP_ADDRESS}:8080:80'
         environment:
             - PUID=${PUID}
             - PGID=${PGID}
@@ -118,40 +158,39 @@ services:
             - PUID=${PUID}
             - PGID=${PGID}
         volumes:
-            - '/etc/localtime:/etc/localtime:ro'
             - '${CONFIGDIRECTORY}/jackett:/config'
 
     # ----------------------------------------
     # MINIO
     # ----------------------------------------
-    minio:
-        image: minio/minio
-        container_name: minio
-        restart: unless-stopped
-        ports:
-            - '${IP_ADDRESS}:9009:9000'
-        environment:
-            - MINIO_ACCESS_KEY=minio
-            - MINIO_SECRET_KEY=minio123
-        volumes:
-            - '${MEDIADIRECTORY}:/export'
-        command: server /export
+    #minio:
+    #    image: minio/minio
+    #    container_name: minio
+    #    restart: unless-stopped
+    #    ports:
+    #        - '${IP_ADDRESS}:9009:9000'
+    #    environment:
+    #        - MINIO_ACCESS_KEY=minio
+    #        - MINIO_SECRET_KEY=minio123
+    #    volumes:
+    #        - '${MEDIADIRECTORY}:/export'
+    #    command: server /export
 
     # ----------------------------------------
     # NETDATA
     # ----------------------------------------
-    netdata:
-        image: titpetric/netdata
-        container_name: netdata
-        restart: unless-stopped
-        ports:
-            - '${IP_ADDRESS}:19999:19999'
-        cap_add:
-            - SYS_PTRACE    
-        volumes:
-            - '/proc:/host/proc:ro'
-            - '/sys:/host/sys:ro'
-            - '/var/run/docker.sock:/var/run/docker.sock'
+    #netdata:
+    #    image: titpetric/netdata
+    #    container_name: netdata
+    #    restart: unless-stopped
+    #    ports:
+    #        - '${IP_ADDRESS}:19999:19999'
+    #    cap_add:
+    #        - SYS_PTRACE
+    #    volumes:
+    #        - '/proc:/host/proc:ro'
+    #        - '/sys:/host/sys:ro'
+    #        - '/var/run/docker.sock:/var/run/docker.sock'
 
     # ----------------------------------------
     # Google OAuth Proxy
@@ -159,14 +198,16 @@ services:
     authproxy:
         image: a5huynh/oauth2_proxy
         container_name: authproxy
+        restart: unless-stopped
         ports:
             - '${IP_ADDRESS}:80:4180'
         command:
             --cookie-secure=false
-            --upstream="http://ombi:3579"
+            --upstream="http://ombi:3579/"
             --http-address="0.0.0.0:4180"
             --redirect-url="http://${DOMAIN}/oauth2/callback"
             --authenticated-emails-file="/data/authed.txt"
+            --skip-provider-button
         environment:
             OAUTH2_PROXY_COOKIE_SECRET: ZQzkmJH8ObiyM5yhhC0QixyNr32cwjNhOIqlUxFpBDDH+dsUgMqCL
             OAUTH2_PROXY_COOKIE_DOMAIN: ${DOMAIN}
@@ -179,7 +220,7 @@ services:
     # OMBI
     # ----------------------------------------
     ombi:
-        image: rogueosb/ombi
+        image: linuxserver/ombi:v2
         container_name: ombi
         restart: unless-stopped
         ports:
@@ -220,14 +261,13 @@ services:
             - '${CONFIGDIRECTORY}/plex/transcode:/transcode'
             - '${MEDIADIRECTORY}/tv:/data/tvshows'
             - '${MEDIADIRECTORY}/movies:/data/movies'
-            - '/etc/localtime:/etc/localtime:ro'
 
     # ----------------------------------------
     # PLEXPY
     # ----------------------------------------
-    plexpy:
-        image: linuxserver/plexpy
-        container_name: plexpy
+    tautulli:
+        image: tautulli/tautulli
+        container_name: tautulli
         restart: unless-stopped
         ports:
             - '${IP_ADDRESS}:8181:8181'
@@ -237,7 +277,6 @@ services:
         volumes:
             - '${CONFIGDIRECTORY}/plexpy:/config'
             - '${CONFIGDIRECTORY}/plex/Library/Application Support/Plex Media Server/Logs:/logs:ro'
-            - '/etc/localtime:/etc/localtime:ro'
         depends_on:
             - plex
 
@@ -256,9 +295,8 @@ services:
         volumes:
             - '${CONFIGDIRECTORY}/portainer:/data'
             - '/var/run/docker.sock:/var/run/docker.sock'
-            - '/etc/localtime:/etc/localtime:ro'
         command: ${PORTAINERSTYLE} -H unix:///var/run/docker.sock
-    
+
     # ----------------------------------------
     # RADARR
     # ----------------------------------------
@@ -274,25 +312,23 @@ services:
         volumes:
             - '${CONFIGDIRECTORY}/radarr:/config'
             - '${MEDIADIRECTORY}:/data'
-            - '/etc/localtime:/etc/localtime:ro'
-    
+
     # ----------------------------------------
     # SICKRAGE
     # ----------------------------------------
-    sickrage:
-        image: linuxserver/sickrage
-        container_name: sickrage
-        restart: unless-stopped
-        ports:
-            - '${IP_ADDRESS}:8081:8081'
-        environment:
-            - PUID=${PUID}
-            - PGID=${PGID}
-        volumes:
-            - '${CONFIGDIRECTORY}/sickrage:/config'
-            - '${MEDIADIRECTORY}/completed:/downloads'
-            - '${MEDIADIRECTORY}/tv:/tv'
-            - '/etc/localtime:/etc/localtime:ro'
+    #sickrage:
+    #    image: linuxserver/sickrage
+    #    container_name: sickrage
+    #    restart: unless-stopped
+    #    ports:
+    #        - '${IP_ADDRESS}:8081:8081'
+    #    environment:
+    #        - PUID=${PUID}
+    #        - PGID=${PGID}
+    #    volumes:
+    #        - '${CONFIGDIRECTORY}/sickrage:/config'
+    #        - '${MEDIADIRECTORY}/completed:/downloads'
+    #        - '${MEDIADIRECTORY}/tv:/tv'
 
     # ----------------------------------------
     # SONARR
@@ -309,7 +345,6 @@ services:
         volumes:
             - '${CONFIGDIRECTORY}/sonarr:/config'
             - '${MEDIADIRECTORY}:/data'
-            - '/etc/localtime:/etc/localtime:ro'
 
     # ----------------------------------------
     # WATCHTOWER
