@@ -111,7 +111,7 @@ services:
             - TRANSMISSION_UPLOAD_SLOTS_PER_TORRENT=10
             - TRANSMISSION_PEER_LIMIT_GLOBAL=200
         volumes:
-            - '${MEDIADIRECTORY}:/data'
+            - '${MEDIADIRECTORY}:/data:delegated'
 
     # ----------------------------------------
     # DUPLICATI
@@ -283,19 +283,19 @@ services:
     # ----------------------------------------
     # PORTAINER
     # ----------------------------------------
-    portainer:
-        image: portainer/portainer:latest
-        container_name: portainer
-        restart: unless-stopped
-        ports:
-            - '${IP_ADDRESS}:9000:9000'
-        environment:
-            - PUID=${PUID}
-            - PGID=${PGID}
-        volumes:
-            - '${CONFIGDIRECTORY}/portainer:/data'
-            - '/var/run/docker.sock:/var/run/docker.sock'
-        command: ${PORTAINERSTYLE} -H unix:///var/run/docker.sock
+    # portainer:
+    #     image: portainer/portainer:latest
+    #     container_name: portainer
+    #     restart: unless-stopped
+    #     ports:
+    #         - '${IP_ADDRESS}:9000:9000'
+    #     environment:
+    #         - PUID=${PUID}
+    #         - PGID=${PGID}
+    #     volumes:
+    #         - '${CONFIGDIRECTORY}/portainer:/data'
+    #         - '/var/run/docker.sock:/var/run/docker.sock'
+    #     command: ${PORTAINERSTYLE} -H unix:///var/run/docker.sock
 
     # ----------------------------------------
     # RADARR
@@ -349,13 +349,12 @@ services:
     # ----------------------------------------
     # WATCHTOWER
     # ----------------------------------------
-    watchtower:
-        image: v2tec/watchtower
-        container_name: watchtower
-        restart: unless-stopped
-        environment:
-            - TZ=${TZ}
-        volumes:
-            - '/var/run/docker.sock:/var/run/docker.sock'
-        command: portainer --schedule @midnight --cleanup
-
+    # watchtower:
+    #     image: v2tec/watchtower
+    #     container_name: watchtower
+    #     restart: unless-stopped
+    #     environment:
+    #         - TZ=${TZ}
+    #     volumes:
+    #         - '/var/run/docker.sock:/var/run/docker.sock'
+    #     command: portainer --schedule @midnight --cleanup
