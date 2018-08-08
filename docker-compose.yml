@@ -74,7 +74,7 @@ services:
     # TRANSMISSION
     # ----------------------------------------
     transmission-openvpn:
-        image: haugene/transmission-openvpn
+        image: haugene/transmission-openvpn:2.0
         container_name: transmission
         restart: unless-stopped
         devices:
@@ -100,7 +100,7 @@ services:
             - TRANSMISSION_QUEUE_STALLED_MINUTES=10
             - TRANSMISSION_PREALLOCATION=2
             - TRANSMISSION_ALT_SPEED_TIME_ENABLED=true
-            - TRANSMISSION_ALT_SPEED_TIME_BEGIN=240
+            - TRANSMISSION_ALT_SPEED_TIME_BEGIN=180
             - TRANSMISSION_ALT_SPEED_TIME_END=900
             - TRANSMISSION_ALT_SPEED_UP=0
             - TRANSMISSION_ALT_SPEED_DOWN=0
@@ -109,7 +109,9 @@ services:
             - TRANSMISSION_SPEED_LIMIT_DOWN=10000
             - TRANSMISSION_SPEED_LIMIT_DOWN_ENABLED=true
             - TRANSMISSION_UPLOAD_SLOTS_PER_TORRENT=10
-            - TRANSMISSION_PEER_LIMIT_GLOBAL=200
+            - TRANSMISSION_PEER_LIMIT_PER_TORRENT=40
+            - TRANSMISSION_PEER_LIMIT_GLOBAL=150
+            - TRANSMISSION_WEB_UI=transmission-web-control
         volumes:
             - '${MEDIADIRECTORY}:/data:delegated'
 
@@ -220,7 +222,7 @@ services:
     # OMBI
     # ----------------------------------------
     ombi:
-        image: linuxserver/ombi:v2
+        image: linuxserver/ombi
         container_name: ombi
         restart: unless-stopped
         ports:
@@ -230,7 +232,6 @@ services:
             - PGID=${PGID}
         volumes:
             - '${CONFIGDIRECTORY}/ombi:/config'
-            - '${MEDIADIRECTORY}:/data'
 
     # ----------------------------------------
     # PLEX
@@ -238,6 +239,7 @@ services:
     plex:
         container_name: plex
         image: plexinc/pms-docker:${PMSTAG}
+        cpu_shares: 2048
         restart: unless-stopped
         ports:
             - '${IP_ADDRESS}:32400:32400/tcp'
@@ -311,7 +313,8 @@ services:
             - PGID=${PGID}
         volumes:
             - '${CONFIGDIRECTORY}/radarr:/config'
-            - '${MEDIADIRECTORY}:/data'
+            - '${MEDIADIRECTORY}/movies:/data/movies'
+            - '${MEDIADIRECTORY}/completed:/data/completed'
 
     # ----------------------------------------
     # SICKRAGE
@@ -344,7 +347,8 @@ services:
             - PGID=${PGID}
         volumes:
             - '${CONFIGDIRECTORY}/sonarr:/config'
-            - '${MEDIADIRECTORY}:/data'
+            - '${MEDIADIRECTORY}/tv:/data/tv'
+            - '${MEDIADIRECTORY}/completed:/data/completed'
 
     # ----------------------------------------
     # WATCHTOWER
