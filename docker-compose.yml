@@ -74,7 +74,7 @@ services:
     # TRANSMISSION
     # ----------------------------------------
     transmission-openvpn:
-        image: haugene/transmission-openvpn:2.0
+        image: haugene/transmission-openvpn
         container_name: transmission
         restart: unless-stopped
         devices:
@@ -210,6 +210,7 @@ services:
             --redirect-url="http://${DOMAIN}/oauth2/callback"
             --authenticated-emails-file="/data/authed.txt"
             --skip-provider-button
+            --pass-basic-auth="false"  # so the proxy doesn't trample on Ombi's Authorization headers
         environment:
             OAUTH2_PROXY_COOKIE_SECRET: ZQzkmJH8ObiyM5yhhC0QixyNr32cwjNhOIqlUxFpBDDH+dsUgMqCL
             OAUTH2_PROXY_COOKIE_DOMAIN: ${DOMAIN}
