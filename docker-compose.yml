@@ -104,13 +104,13 @@ services:
             - TRANSMISSION_ALT_SPEED_TIME_END=900
             - TRANSMISSION_ALT_SPEED_UP=0
             - TRANSMISSION_ALT_SPEED_DOWN=0
-            - TRANSMISSION_SPEED_LIMIT_UP=6250
+            - TRANSMISSION_SPEED_LIMIT_UP=15000
             - TRANSMISSION_SPEED_LIMIT_UP_ENABLED=true
-            - TRANSMISSION_SPEED_LIMIT_DOWN=10000
+            - TRANSMISSION_SPEED_LIMIT_DOWN=25000
             - TRANSMISSION_SPEED_LIMIT_DOWN_ENABLED=true
-            - TRANSMISSION_UPLOAD_SLOTS_PER_TORRENT=10
+            - TRANSMISSION_UPLOAD_SLOTS_PER_TORRENT=20
             - TRANSMISSION_PEER_LIMIT_PER_TORRENT=40
-            - TRANSMISSION_PEER_LIMIT_GLOBAL=150
+            - TRANSMISSION_PEER_LIMIT_GLOBAL=500
             - TRANSMISSION_WEB_UI=transmission-web-control
         volumes:
             - '${MEDIADIRECTORY}:/data:delegated'
@@ -118,19 +118,19 @@ services:
     # ----------------------------------------
     # DUPLICATI
     # ----------------------------------------
-    #duplicati:
-    #    image: linuxserver/duplicati
-    #    container_name: duplicati
-    #    restart: unless-stopped
-    #    ports:
-    #        - '${IP_ADDRESS}:8200:8200'
-    #    environment:
-    #        - PUID=${PUID}
-    #        - PGID=${PGID}
-    #    volumes:
-    #        - '${CONFIGDIRECTORY}/duplicati:/config'
-    #        - '${CONFIGDIRECTORY}/duplicati/backups:/backups'
-    #        - '${CONFIGDIRECTORY}:/source'
+    duplicati:
+        image: linuxserver/duplicati
+        container_name: duplicati
+        restart: unless-stopped
+        ports:
+            - '${IP_ADDRESS}:8200:8200'
+        environment:
+            - PUID=${PUID}
+            - PGID=${PGID}
+        volumes:
+            - '${CONFIGDIRECTORY}/duplicati:/config'
+            - '${MEDIADIRECTORY}/config-backups:/backups'
+            - '${CONFIGDIRECTORY}:/source'
 
     # ----------------------------------------
     # HTTP
