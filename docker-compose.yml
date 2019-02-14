@@ -11,7 +11,7 @@
 ##
 ## Have docker-compose.yml and .env in the same directory to launch the stack
 
-version: '2'
+version: '2.4'
 
 ######################
 # SERVICES TO LAUNCH #
@@ -77,6 +77,7 @@ services:
         image: haugene/transmission-openvpn
         container_name: transmission
         restart: unless-stopped
+        cpus: 2
         devices:
             - '/dev/net/tun:/dev/net/tun'
         ports:
@@ -102,7 +103,7 @@ services:
             - TRANSMISSION_CACHE_SIZE_MB=10
             - TRANSMISSION_ALT_SPEED_TIME_ENABLED=true
             - TRANSMISSION_ALT_SPEED_TIME_BEGIN=180
-            - TRANSMISSION_ALT_SPEED_TIME_END=420
+            - TRANSMISSION_ALT_SPEED_TIME_END=480
             - TRANSMISSION_ALT_SPEED_UP=0
             - TRANSMISSION_ALT_SPEED_DOWN=0
             - TRANSMISSION_SPEED_LIMIT_UP=15000
@@ -115,7 +116,11 @@ services:
             - TRANSMISSION_WEB_UI=transmission-web-control
             - TRANSMISSION_SCRAPE_PAUSED_TORRENTS_ENABLED=false
         volumes:
-            - '${MEDIADIRECTORY}:/data:delegated'
+            #- '${MEDIAINCOMPLETEDIRECTORY}/transmission-home:/data/transmission-home:delegated'
+            #- '${MEDIAINCOMPLETEDIRECTORY}/incomplete:/data/incomplete:delegated'
+            - '${MEDIACOMPLETEDIRECTORY}/completed:/data/completed:delegated'
+            - '${MEDIACOMPLETEDIRECTORY}/transmission-home:/data/transmission-home:delegated'
+            - '${MEDIACOMPLETEDIRECTORY}/incomplete:/data/incomplete:delegated'
 
     # ----------------------------------------
     # DUPLICATI
@@ -124,6 +129,7 @@ services:
         image: linuxserver/duplicati
         container_name: duplicati
         restart: unless-stopped
+        cpus: 1.5
         ports:
             - '${IP_ADDRESS}:8200:8200'
         environment:
@@ -131,7 +137,7 @@ services:
             - PGID=${PGID}
         volumes:
             - '${CONFIGDIRECTORY}/duplicati:/config'
-            - '${MEDIADIRECTORY}/config-backups:/backups'
+            - '${MEDIACOMPLETEDIRECTORY}/config-backups:/backups'
             - '${CONFIGDIRECTORY}:/source'
 
     # ----------------------------------------
@@ -141,6 +147,7 @@ services:
         image: fnichol/uhttpd
         container_name: uhttpd
         restart: unless-stopped
+        cpus: 1.5
         ports:
             - '${IP_ADDRESS}:8080:80'
         environment:
@@ -156,6 +163,7 @@ services:
         image: linuxserver/jackett
         container_name: jackett
         restart: unless-stopped
+        cpus: 1.5
         ports:
             - '${IP_ADDRESS}:9117:9117'
         environment:
@@ -203,6 +211,7 @@ services:
         image: a5huynh/oauth2_proxy
         container_name: authproxy
         restart: unless-stopped
+        cpus: 1.5
         ports:
             - '${IP_ADDRESS}:80:4180'
         command:
@@ -228,6 +237,7 @@ services:
         image: linuxserver/ombi
         container_name: ombi
         restart: unless-stopped
+        cpus: 1.5
         ports:
             - '${IP_ADDRESS}:3579:3579'
         environment:
@@ -242,8 +252,9 @@ services:
     plex:
         container_name: plex
         image: plexinc/pms-docker:${PMSTAG}
-        cpu_shares: 2048
         restart: unless-stopped
+        cpu_shares: 2048
+        cpus: 4
         ports:
             - '${IP_ADDRESS}:32400:32400/tcp'
             - '${IP_ADDRESS}:3005:3005/tcp'
@@ -264,8 +275,8 @@ services:
         volumes:
             - '${CONFIGDIRECTORY}/plex:/config'
             - '${CONFIGDIRECTORY}/plex/transcode:/transcode'
-            - '${MEDIADIRECTORY}/tv:/data/tvshows'
-            - '${MEDIADIRECTORY}/movies:/data/movies'
+            - '${MEDIACOMPLETEDIRECTORY}/tv:/data/tvshows'
+            - '${MEDIACOMPLETEDIRECTORY}/movies:/data/movies'
 
     # ----------------------------------------
     # PLEXPY
@@ -274,6 +285,7 @@ services:
         image: tautulli/tautulli
         container_name: tautulli
         restart: unless-stopped
+        cpus: 1.5
         ports:
             - '${IP_ADDRESS}:8181:8181'
         environment:
@@ -309,6 +321,7 @@ services:
         image: linuxserver/radarr
         container_name: radarr
         restart: unless-stopped
+        cpus: 1.5
         ports:
             - '${IP_ADDRESS}:7878:7878'
         environment:
@@ -316,8 +329,8 @@ services:
             - PGID=${PGID}
         volumes:
             - '${CONFIGDIRECTORY}/radarr:/config'
-            - '${MEDIADIRECTORY}/movies:/data/movies'
-            - '${MEDIADIRECTORY}/completed:/data/completed'
+            - '${MEDIACOMPLETEDIRECTORY}/movies:/data/movies'
+            - '${MEDIACOMPLETEDIRECTORY}/completed:/data/completed'
 
     # ----------------------------------------
     # SICKRAGE
@@ -343,6 +356,7 @@ services:
         image: linuxserver/sonarr
         container_name: sonarr
         restart: unless-stopped
+        cpus: 1.5
         ports:
             - '${IP_ADDRESS}:8989:8989'
         environment:
@@ -350,8 +364,8 @@ services:
             - PGID=${PGID}
         volumes:
             - '${CONFIGDIRECTORY}/sonarr:/config'
-            - '${MEDIADIRECTORY}/tv:/data/tv'
-            - '${MEDIADIRECTORY}/completed:/data/completed'
+            - '${MEDIACOMPLETEDIRECTORY}/tv:/data/tv'
+            - '${MEDIACOMPLETEDIRECTORY}/completed:/data/completed'
 
     # ----------------------------------------
     # WATCHTOWER
