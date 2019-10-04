@@ -271,7 +271,7 @@ services:
             - ALLOWED_NETWORKS=${CIDR_ADDRESS}
             - PLEX_UID=${PUID}
             - PLEX_GID=${PGID}
-        hostname: ${HOSTNAME}
+            - TZ=${TZ}
         volumes:
             - '${CONFIGDIRECTORY}/plex:/config'
             - '${CONFIGDIRECTORY}/plex/transcode:/transcode'
@@ -291,6 +291,7 @@ services:
         environment:
             - PUID=${PUID}
             - PGID=${PGID}
+            - TZ=${TZ}
         volumes:
             - '${CONFIGDIRECTORY}/plexpy:/config'
             - '${CONFIGDIRECTORY}/plex/Library/Application Support/Plex Media Server/Logs:/logs:ro'
@@ -327,10 +328,14 @@ services:
         environment:
             - PUID=${PUID}
             - PGID=${PGID}
+            - TZ=${TZ}
         volumes:
             - '${CONFIGDIRECTORY}/radarr:/config'
             - '${MEDIACOMPLETEDIRECTORY}/movies:/data/movies'
             - '${MEDIACOMPLETEDIRECTORY}/completed:/data/completed'
+        depends_on:
+            - jackett
+            - transmission-openvpn
 
     # ----------------------------------------
     # SICKRAGE
@@ -362,10 +367,36 @@ services:
         environment:
             - PUID=${PUID}
             - PGID=${PGID}
+            - TZ=${TZ}
         volumes:
             - '${CONFIGDIRECTORY}/sonarr:/config'
             - '${MEDIACOMPLETEDIRECTORY}/tv:/data/tv'
             - '${MEDIACOMPLETEDIRECTORY}/completed:/data/completed'
+        depends_on:
+            - jackett
+            - transmission-openvpn
+
+    # ----------------------------------------
+    # BAZARR
+    # ----------------------------------------
+    bazarr:
+        image: linuxserver/bazarr
+        container_name: bazarr
+        restart: unless-stopped
+        cpus: 1.5
+        ports:
+            - '${IP_ADDRESS}:6767:6767'
+        environment:
+            - PUID=${PUID}
+            - PGID=${PGID}
+            - TZ=${TZ}
+        volumes:
+            - '${CONFIGDIRECTORY}/bazarr:/config'
+            - '${MEDIACOMPLETEDIRECTORY}/tv:/tv'
+            - '${MEDIACOMPLETEDIRECTORY}/movies:/movies'
+        depends_on:
+            - sonarr
+            - radarr
 
     # ----------------------------------------
     # WATCHTOWER
