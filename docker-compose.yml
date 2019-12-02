@@ -208,22 +208,27 @@ services:
     # Google OAuth Proxy
     # ----------------------------------------
     authproxy:
-        image: a5huynh/oauth2_proxy
+        image: quay.io/pusher/oauth2_proxy
         container_name: authproxy
         restart: unless-stopped
         cpus: 1.5
         ports:
             - '${IP_ADDRESS}:80:4180'
         command:
-            --cookie-secure=false
-            --upstream="http://ombi:3579/"
-            --http-address="0.0.0.0:4180"
-            --redirect-url="http://${DOMAIN}/oauth2/callback"
-            --authenticated-emails-file="/data/authed.txt"
-            --skip-provider-button
-            --pass-basic-auth="false"  # so the proxy doesn't trample on Ombi's Authorization headers
+            # - -cookie-secure=false
+            - -upstream=http://ombi:3579/
+            - -upstream=http://ombi:3579/ombi
+            - -http-address=0.0.0.0:4180
+            - -redirect-url=https://${DOMAIN}/oauth2/callback
+            - -cookie-domain=${DOMAIN}
+            - -cookie-expire=1440h  # 60 days
+            - -cookie-refresh=360h  # 15 days
+            - -authenticated-emails-file=/data/authed.txt
+            - -skip-provider-button
+            - -pass-user-headers=true
+            - -pass-basic-auth=false  # so the proxy doesn't trample on Ombi's Authorization headers
         environment:
-            OAUTH2_PROXY_COOKIE_SECRET: ZQzkmJH8ObiyM5yhhC0QixyNr32cwjNhOIqlUxFpBDDH+dsUgMqCL
+            OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_PROXY_COOKIE_SECRET}
             OAUTH2_PROXY_COOKIE_DOMAIN: ${DOMAIN}
             OAUTH2_PROXY_CLIENT_ID: ${OAUTH2_PROXY_CLIENT_ID}
             OAUTH2_PROXY_CLIENT_SECRET: ${OAUTH2_PROXY_CLIENT_SECRET}
@@ -272,6 +277,16 @@ services:
             - PLEX_UID=${PUID}
             - PLEX_GID=${PGID}
             - TZ=${TZ}
+            # HARDWARE TRANSCODING IS SOOOOO WORTH IT, gets approx 10x faster transcodes!!!
+            # https://www.funkypenguin.co.nz/note/gpu-transcoding-with-emby-plex-using-docker-nvidia/
+            # https://hub.docker.com/r/linuxserver/plex
+            # https://forums.plex.tv/t/how-to-setup-nvidia-hw-acceleration-in-ubuntu-docker/288625/8?u=cmuellersmith
+            # https://github.com/NVIDIA/nvidia-docker
+            # basically: install the latest drivers (ubuntu-drivers works), then nvidia-docker2 package,
+            # then add these env vars, then restart docker and destroy / recreate the plex container
+            - NVIDIA_VISIBLE_DEVICES=all
+            - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+        runtime: nvidia
         volumes:
             - '${CONFIGDIRECTORY}/plex:/config'
             - '${CONFIGDIRECTORY}/plex/transcode:/transcode'
