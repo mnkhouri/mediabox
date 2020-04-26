@@ -1,0 +1,16 @@
+[package]
+name = "dedupe"
+version = "0.1.0"
+authors = ["Marc Khouri <marc@khouri.ca>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+walkdir = "2"
+structopt = "0.3"
+question = "0.2.2"
+stderrlog = "0.4"
+log = "0.4"
+regex = "1"
+lazy_static = "1.4"

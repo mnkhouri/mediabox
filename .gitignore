@@ -22,3 +22,6 @@ $RECYCLE.BIN/
 *.lnk
 sftp-config.json
 .env
+
+# Rust / Cargo files
+target/
