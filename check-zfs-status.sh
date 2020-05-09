@@ -12,7 +12,8 @@ else
     echo "$subject"
 fi
 
-body=$(zpool status -v)
+body1=$(zfs list tank)
+body2=$(zpool status -v)
 
 mailHeader=$(cat <<EOF
     <html>
@@ -27,4 +28,4 @@ mailFooter=$(cat <<EOF
 EOF
 )
 
-echo "$mailHeader$body$mailFooter" | mail -a 'Content-Type: text/html' -s "$subject" yacoutamia@gmail.com
+echo -e "$mailHeader$body1\n\n$body2$mailFooter" | mail -a 'Content-Type: text/html' -s "$subject" yacoutamia@gmail.com
