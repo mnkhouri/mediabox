@@ -445,3 +445,21 @@ services:
     #     volumes:
     #         - '/var/run/docker.sock:/var/run/docker.sock'
     #     command: portainer --schedule @midnight --cleanup
+
+    # ----------------------------------------
+    # IMDB RATING UPDATE TOOL
+    # ----------------------------------------
+    imdbupdater:
+        image: mynttt/updatetool
+        container_name: imdbupdater
+        restart: unless-stopped
+        cpus: 1.5
+        environment:
+            # - TMDB_API_KEY=${TMDB_API_KEY}
+            # - TVDB_API_KEY=${TVDB_API_KEY}
+            - TZ=${TZ}
+        volumes:
+            - '${CONFIGDIRECTORY}/imdbupdater:/config'
+            - '${CONFIGDIRECTORY}/plex/Library/Application Support/Plex Media Server:/plexdata'
+        depends_on:
+            - plex
