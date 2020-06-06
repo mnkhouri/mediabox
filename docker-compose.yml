@@ -107,7 +107,7 @@ services:
             - TRANSMISSION_ALT_SPEED_TIME_END=480
             - TRANSMISSION_ALT_SPEED_UP=0
             - TRANSMISSION_ALT_SPEED_DOWN=0
-            - 'TRANSMISSION_RPC_WHITELIST=127.0.0.1,10.20.*.*'
+            - 'TRANSMISSION_RPC_WHITELIST=127.0.0.1,10.20.30.*,10.110.210.*,10.90.90.*,10.84.84.*,10.89.89.*'
             - TRANSMISSION_SPEED_LIMIT_UP=15000
             - TRANSMISSION_SPEED_LIMIT_UP_ENABLED=true
             - TRANSMISSION_SPEED_LIMIT_DOWN=25000
@@ -210,7 +210,7 @@ services:
     # Google OAuth Proxy
     # ----------------------------------------
     authproxy:
-        image: quay.io/pusher/oauth2_proxy
+        image: quay.io/oauth2-proxy/oauth2-proxy
         container_name: authproxy
         restart: unless-stopped
         cpus: 1.5
@@ -279,7 +279,7 @@ services:
         image: plexinc/pms-docker:${PMSTAG}
         restart: unless-stopped
         cpu_shares: 2048
-        cpus: 4
+        cpus: 6
         ports:
             - '${IP_ADDRESS}:32400:32400/tcp'
             - '${IP_ADDRESS}:3005:3005/tcp'
