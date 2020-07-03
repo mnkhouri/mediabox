@@ -1,14 +1,19 @@
 #![warn(clippy::all)]
-
-use lazy_static::lazy_static;
-use log::{debug, info, trace, warn};
-use question::{Answer, Question};
-use regex::Regex;
-use std::collections::HashMap;
-use std::fs;
-use std::path::{Path, PathBuf};
-use structopt::StructOpt;
-use walkdir::{DirEntry, DirEntryExt, WalkDir};
+use {
+    anyhow::Error,
+    blake2::{Blake2b, Digest},
+    lazy_static::lazy_static,
+    log::{debug, info, trace, warn},
+    question::{Answer, Question},
+    regex::Regex,
+    std::{
+        collections::HashMap,
+        fs, io,
+        path::{Path, PathBuf},
+    },
+    structopt::StructOpt,
+    walkdir::{DirEntry, DirEntryExt, WalkDir},
+};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "dedupe")]
@@ -21,6 +26,10 @@ struct Opt {
     /// Perform hard links (if not present, will do a dry-run)
     #[structopt(long)]
     hardlink: bool,
+
+    /// Hash uncertain files (if not present, will skip these files)
+    #[structopt(long)]
+    hash: bool,
 
     /// Minimum filesize in MB
     #[structopt(short, long, required = true)]
@@ -77,50 +86,22 @@ fn main() {
     });
 
     for files in duplicate_sizes {
-        let mut danger = false;
-        if files.len() > 2 {
-            warn!("Multiple files here!");
-            danger = true;
-        }
-        match generate_probable_episode(files[0].path()) {
-            None => {
-                let all_titles_match = files.windows(2).all(|w| {
-                    generate_probable_name(w[0].path()) == generate_probable_name(w[1].path())
-                });
-                if !all_titles_match {
-                    warn!("Differing titles guessed!");
-                    danger = true;
+        if let Ok(_is_duplicate) = verify_duplicate(&files, opt.hash) {
+            if opt.hardlink {
+                hardlink(
+                    files
+                        .into_iter()
+                        .map(move |f| f.path().to_path_buf())
+                        .collect(),
+                );
+            } else {
+                info!("Likely duplicates: ");
+                for file in files {
+                    info!("\t{}", file.path().display());
                 }
             }
-            Some(_) => {
-                let all_episodes_match = files.windows(2).all(|w| {
-                    generate_probable_episode(w[0].path()) == generate_probable_episode(w[1].path())
-                });
-                if (!all_episodes_match)
-                    && files.iter().all(|w| !is_paw_patrol_bar_rescue(w.path()))
-                {
-                    warn!("Differing episodes guessed!");
-                    danger = true;
-                }
-            }
-        };
-        if danger {
-            warn!("Skipping dedupe");
-            for file in files {
-                warn!("\t{}", file.path().display());
-            }
-        } else if opt.hardlink {
-            hardlink(
-                files
-                    .into_iter()
-                    .map(move |f| f.path().to_path_buf())
-                    .collect(),
-            );
         } else {
-            info!("Likely duplicates: ");
-            for file in files {
-                info!("\t{}", file.path().display());
-            }
+            info!("Skipping dedupe due to file mismatch");
         }
     }
 
@@ -162,17 +143,99 @@ fn ensure_conflicts_are_stopped() -> Result<(), &'static str> {
     }
 }
 
+fn verify_duplicate(files: &[DirEntry], do_expensive_check: bool) -> Result<(), ()> {
+    let mut danger = false;
+
+    if let Some(_air_date) = generate_probable_air_date(files[0].path()) {
+        let all_dates_match = files.windows(2).all(|w| {
+            generate_probable_air_date(w[0].path()) == generate_probable_air_date(w[1].path())
+        });
+        if !all_dates_match {
+            warn!("Differing air dates guessed!");
+            for file in files {
+                warn!("\t{:?}", generate_probable_air_date(file.path()));
+                warn!("\t\t{}", file.path().display());
+            }
+            danger = true;
+        }
+    } else if let Some(_episode) = generate_probable_episode(files[0].path()) {
+        let all_episodes_match = files.windows(2).all(|w| {
+            generate_probable_episode(w[0].path()) == generate_probable_episode(w[1].path())
+        });
+        if (!all_episodes_match) && files.iter().all(|w| !is_paw_patrol_bar_rescue(w.path())) {
+            warn!("Differing episodes guessed!");
+            for file in files {
+                warn!("\t{:?}", generate_probable_episode(file.path()));
+                warn!("\t\t{:?}", file.path().display());
+            }
+            danger = true;
+        }
+    } else {
+        let all_titles_match = files
+            .windows(2)
+            .all(|w| generate_probable_name(w[0].path()) == generate_probable_name(w[1].path()));
+        if !all_titles_match {
+            warn!("Differing titles guessed!");
+            for file in files {
+                warn!("\t{}", generate_probable_name(file.path()));
+                warn!("\t\t{}", file.path().display());
+            }
+            danger = true;
+        }
+    }
+
+    if files.len() > 2 {
+        warn!("More than 2 files at this size!");
+        for file in files {
+            warn!("\t\t{}", file.path().display());
+        }
+        danger = true;
+    }
+
+    // If we have danger, check the hash
+    if danger {
+        if !do_expensive_check {
+            return Err(());
+        }
+        warn!("Need to calculate hash:");
+        let all_hashes_match = files.windows(2).all(|w| {
+            if let Ok(hash1) = generate_hash(w[0].path()) {
+                if let Ok(hash2) = generate_hash(w[1].path()) {
+                    return hash1 == hash2;
+                }
+            }
+            false
+        });
+        if !all_hashes_match {
+            warn!("Hashes differ!");
+            return Err(());
+        }
+    }
+
+    Ok(())
+}
+
+fn generate_hash(path: &Path) -> Result<Vec<u8>, Error> {
+    let mut file = fs::File::open(&path)?;
+    let mut hasher = Blake2b::new();
+    let _n = io::copy(&mut file, &mut hasher)?;
+    let hash = hasher.result();
+    Ok(hash.to_vec())
+}
+
 fn generate_probable_name(path: &Path) -> String {
     let filename = path.file_stem().unwrap();
-    let title_guess = filename
-        .to_str()
-        .unwrap()
-        .split('.')
-        .next()
-        .unwrap()
-        .split(" (")
-        .next()
-        .unwrap();
+    let title_guess = filename.to_str().unwrap();
+    let title_guess = title_guess.replace(".", " "); // convert all periods to spaces
+    let title_guess = title_guess.replace("cls", ""); // stupid release group
+    let title_guess = title_guess.replace("-", " "); // remove all punctuation
+    let title_guess = title_guess.replace(",", " "); // remove all punctuation
+    let title_guess = title_guess.replace("!", " "); // remove all punctuation
+    let title_guess = title_guess.replace("  ", " "); // remove all duplicate spaces
+    let title_guess = title_guess.split(" (").next().unwrap(); // only keep up to the first "(2019)"
+    let title_guess = title_guess.split(char::is_numeric).next().unwrap(); // only keep up to the first number
+    let title_guess = title_guess.to_ascii_lowercase();
+    let title_guess = title_guess.trim();
     trace!("Guessing {} for {}", title_guess, path.display());
     String::from(title_guess)
 }
@@ -187,6 +250,18 @@ fn generate_probable_episode(path: &Path) -> Option<String> {
         .map(|re_match| re_match[0].to_uppercase());
     trace!("Guessing {:?} for {}", episode_guess, path.display());
     episode_guess
+}
+
+fn generate_probable_air_date(path: &Path) -> Option<String> {
+    let filename = path.file_stem().unwrap();
+    lazy_static! {
+        static ref RE: Regex = Regex::new(r"(\d\d\d\d)[.-](\d\d)[.-](\d\d)").unwrap();
+    }
+    let date_guess = RE
+        .captures(filename.to_str().unwrap())
+        .map(|re_match| "".to_owned() + &re_match[1] + &re_match[2] + &re_match[3]);
+    trace!("Guessing {:?} for {}", date_guess, path.display());
+    date_guess
 }
 
 fn walk_directory(path: PathBuf, min_filesize_mb: u64) -> impl Iterator<Item = DirEntry> {
