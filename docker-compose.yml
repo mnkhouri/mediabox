@@ -519,16 +519,25 @@ services:
     # NGINX RTMP/HLS
     # ----------------------------------------
     nginx-rtmp:
-        image: alfg/nginx-rtmp
+        build:
+            context: ~/code/docker-nginx-rtmp
+            dockerfile: Dockerfile
         container_name: nginx-rtmp
+        runtime: nvidia
         restart: unless-stopped
         cpus: 2
         ports:
             - '1935:1935'
             - '1936:80'
             - '1937:443'
+            - '5005:5005/udp'
         environment:
             - RTMP_PORT=1935
+            - INCOMING_UDP_PORT=5005
+            - IP_ADDRESS=${IP_ADDRESS}
+            - HDHR_IP_ADDRESS=${HDHR_IP_ADDRESS}
+            - NVIDIA_VISIBLE_DEVICES=all
+            - NVIDIA_DRIVER_CAPABILITIES=all
         volumes:
             # - '${CONFIGDIRECTORY}/nginx-rtmp/certs:/opt/certs'
             - '${CONFIGDIRECTORY}/nginx-rtmp/nginx.conf:/etc/nginx/nginx.conf.template'
