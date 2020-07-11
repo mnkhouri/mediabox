@@ -529,7 +529,6 @@ services:
         ports:
             - '1935:1935'
             - '1936:80'
-            - '1937:443'
             - '5005:5005/udp'
         environment:
             - RTMP_PORT=1935
@@ -538,10 +537,25 @@ services:
             - HDHR_IP_ADDRESS=${HDHR_IP_ADDRESS}
             - NVIDIA_VISIBLE_DEVICES=all
             - NVIDIA_DRIVER_CAPABILITIES=all
+            - TUNER_NUMBER=1
+            - FLAG_PATH=/tmp/someoneIsWatching
         volumes:
             # - '${CONFIGDIRECTORY}/nginx-rtmp/certs:/opt/certs'
             - '${CONFIGDIRECTORY}/nginx-rtmp/nginx.conf:/etc/nginx/nginx.conf.template'
             - '${CONFIGDIRECTORY}/nginx-rtmp/static:/mnt/static'
+
+    # ----------------------------------------
+    # VIDEO/TV FRONTEND
+    # ----------------------------------------
+    video-website:
+        build:
+            context: ~/code/video-website
+            dockerfile: Dockerfile
+        container_name: video-website
+        restart: unless-stopped
+        cpus: 0.5
+        ports:
+            - '3000'
 
     # ----------------------------------------
     # TRAEFIK
@@ -549,6 +563,7 @@ services:
     traefik:
         image: traefik:v2.2
         container_name: traefik
+        restart: unless-stopped
         ports:
           - '80:80'
           - '443:443'
