@@ -227,7 +227,7 @@ services:
             - --cookie-name=oauth_proxy_ombi_2  # Bump this when changing domain / hostname
             - --cookie-domain=${DOMAIN_OMBI_1}
             - --cookie-expire=1440h  # 60 days
-            - --cookie-refresh=360h  # 15 days
+            - --cookie-refresh=1h
             - --authenticated-emails-file=/data/authed.txt
             - --skip-provider-button
             - --pass-user-headers=true
@@ -266,10 +266,11 @@ services:
             - --cookie-name=oauth_proxy_rtmp_1  # Bump this when changing domain / hostname
             - --cookie-domain=${DOMAIN_NGINX_RTMP_1}
             - --cookie-expire=1440h  # 60 days
-            - --cookie-refresh=360h  # 15 days
+            - --cookie-refresh=1h
             - --authenticated-emails-file=/data/authed.txt
             - --skip-provider-button
             - --pass-user-headers=true
+            - --pass-access-token=true
         environment:
             OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_PROXY_COOKIE_SECRET}
             OAUTH2_PROXY_COOKIE_DOMAIN: ${DOMAIN_NGINX_RTMP_1}
@@ -539,6 +540,7 @@ services:
             - NVIDIA_DRIVER_CAPABILITIES=all
             - TUNER_NUMBER=1
             - FLAG_PATH=/tmp/someoneIsWatching
+            - TZ=${TZ}
         volumes:
             # - '${CONFIGDIRECTORY}/nginx-rtmp/certs:/opt/certs'
             - '${CONFIGDIRECTORY}/nginx-rtmp/nginx.conf:/etc/nginx/nginx.conf.template'
