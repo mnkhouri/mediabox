@@ -126,6 +126,24 @@ services:
             - '${MEDIACOMPLETEDIRECTORY}/incomplete:/data/incomplete:delegated'
 
     # ----------------------------------------
+    # SABNZBD
+    # ----------------------------------------
+    sabnzbd:
+        image: linuxserver/sabnzbd:unstable # remove the "unstable" tag once 3.0 is published https://github.com/sabnzbd/sabnzbd/releases
+        container_name: sabnzbd
+        restart: unless-stopped
+        environment:
+            - PUID=${PUID}
+            - PGID=${PGID}
+            - TZ=${TZ}
+        volumes:
+            - '${CONFIGDIRECTORY}/sabnzbd:/config'
+            - '${MEDIACOMPLETEDIRECTORY}/completed:/downloads'
+            - '${MEDIACOMPLETEDIRECTORY}/incomplete:/incomplete-downloads'
+        ports:
+            - 8081:8080
+
+    # ----------------------------------------
     # DUPLICATI
     # ----------------------------------------
     duplicati:
@@ -176,6 +194,23 @@ services:
             - '${CONFIGDIRECTORY}/jackett:/config'
 
     # ----------------------------------------
+    # NZBHYDRA2
+    # ----------------------------------------
+    nzbhydra2:
+        image: linuxserver/nzbhydra2
+        container_name: nzbhydra2
+        restart: unless-stopped
+        environment:
+            - PUID=${PUID}
+            - PGID=${PGID}
+            - TZ=${TZ}
+        volumes:
+            - '${CONFIGDIRECTORY}/nzbhydra2:/config'
+        ports:
+            - '5076:5076'
+        depends_on:
+            - jackett
+    # ----------------------------------------
     # MINIO
     # ----------------------------------------
     #minio:
@@ -218,7 +253,6 @@ services:
         ports:
             - '4180'
         command:
-            # - --cookie-secure=false
             - --reverse-proxy=true  # Running behind traefik
             - --upstream=http://ombi:3579/
             - --upstream=http://ombi:3579/ombi
@@ -228,6 +262,7 @@ services:
             - --cookie-domain=${DOMAIN_OMBI_1}
             - --cookie-expire=1440h  # 60 days
             - --cookie-refresh=1h
+            - --cookie-samesite=lax
             - --authenticated-emails-file=/data/authed.txt
             - --skip-provider-button
             - --pass-user-headers=true
@@ -258,7 +293,6 @@ services:
         ports:
             - '4180'
         command:
-            # - --cookie-secure=false
             - --reverse-proxy=true  # Running behind traefik
             - --upstream=http://nginx-rtmp:80/
             - --http-address=0.0.0.0:4180
@@ -267,6 +301,7 @@ services:
             - --cookie-domain=${DOMAIN_NGINX_RTMP_1}
             - --cookie-expire=1440h  # 60 days
             - --cookie-refresh=1h
+            - --cookie-samesite=lax
             - --authenticated-emails-file=/data/authed.txt
             - --skip-provider-button
             - --pass-user-headers=true
@@ -566,6 +601,7 @@ services:
             - TUNER_NUMBER=1
             - FLAG_PATH=/tmp/someoneIsWatching
             - TZ=${TZ}
+            - URL_FRAGMENT=${URL_FRAGMENT}
         volumes:
             # - '${CONFIGDIRECTORY}/nginx-rtmp/certs:/opt/certs'
             - '${CONFIGDIRECTORY}/nginx-rtmp/nginx.conf:/etc/nginx/nginx.conf.template'
@@ -585,6 +621,8 @@ services:
         cpus: 0.5
         ports:
             - '3000'
+        environment:
+            - URL_FRAGMENT=${URL_FRAGMENT}
 
     # ----------------------------------------
     # TRAEFIK
@@ -601,9 +639,9 @@ services:
             - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
         command:
             - '--accesslog=true'
-            # - '--log.level=DEBUG'
-            # - --accesslog.format=json
-            # - --accesslog.fields.defaultmode=keep
+            - '--log.level=DEBUG'
+            - --accesslog.format=json
+            - --accesslog.fields.defaultmode=keep
             - '--providers.docker=true' # listens to docker
             - "--providers.docker.exposedbydefault=false"
             - '--api.insecure=true' # enables the web ui on :8080
@@ -613,16 +651,23 @@ services:
             - '--certificatesResolvers.leresolver.acme.storage=/acme.json'
             - '--certificatesResolvers.leresolver.acme.dnsChallenge=true'
             - '--certificatesResolvers.leresolver.acme.dnsChallenge.provider=cloudflare'
-            - '--certificatesResolvers.leresolver.acme.caServer=https://acme-staging-v02.api.letsencrypt.org/directory' # uses staging server
+            # - '--certificatesResolvers.leresolver.acme.caServer=https://acme-staging-v02.api.letsencrypt.org/directory' # uses staging server
             - '--global.sendAnonymousUsage'
         volumes:
             - /var/run/docker.sock:/var/run/docker.sock  # So that Traefik can listen to the Docker events
             - '${CONFIGDIRECTORY}/traefik/acme.json:/acme.json'
         labels:
-            # HTTP -> HTTPS
             - traefik.enable=true
+            # HTTP -> HTTPS
             - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
             - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
-            - "traefik.http.routers.redirect-https.rule=hostregexp(`{host:.+}`)"
+            - "traefik.http.routers.redirect-https.rule=HostRegexp(`{host:.+}`)"
             - "traefik.http.routers.redirect-https.entrypoints=http"
             - "traefik.http.routers.redirect-https.middlewares=redirect-to-https"
+            # Bare domain to a subdomain
+            - "traefik.http.middlewares.redirect-top-domain.redirectregex.regex=^http(s?)://.*${DOMAIN_TOP}.*"
+            - "traefik.http.middlewares.redirect-top-domain.redirectregex.replacement=http$$1://${DOMAIN_OMBI_1}"
+            - "traefik.http.routers.redirect-top-domain.rule=Host(`${DOMAIN_TOP}`)"
+            - "traefik.http.routers.redirect-top-domain.entrypoints=https"
+            - "traefik.http.routers.redirect-top-domain.middlewares=redirect-top-domain"
+            - "traefik.http.routers.redirect-top-domain.tls.certresolver=leresolver"
