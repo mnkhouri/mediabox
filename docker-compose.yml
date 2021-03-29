@@ -87,12 +87,18 @@ services:
         dns:
             - 8.8.8.8
             - 8.8.4.4
+        healthcheck:
+            test: "transmission-remote --session-stats || exit 1"
+            interval: "30s"
+            timeout: "10s"
+            start_period: "6m"
+            retries: 2
         environment:
             - OPENVPN_PROVIDER=PIA
             - OPENVPN_USERNAME=${PIAUNAME}
             - OPENVPN_PASSWORD=${PIAPASS}
-            - 'OPENVPN_CONFIG=CA Montreal'
-            #- 'OPENVPN_CONFIG=CA Toronto'
+            - 'OPENVPN_CONFIG=ca_montreal'
+            #- 'OPENVPN_CONFIG=ca_toronto'
             - ENABLE_UFW=true
             - LOCAL_NETWORK=${CIDR_ADDRESS}
             - 'OPENVPN_OPTS=--inactive 3600 --ping 10 --ping-exit 60'
@@ -119,11 +125,9 @@ services:
             - TRANSMISSION_WEB_UI=transmission-web-control
             - TRANSMISSION_SCRAPE_PAUSED_TORRENTS_ENABLED=false
         volumes:
-            #- '${MEDIAINCOMPLETEDIRECTORY}/transmission-home:/data/transmission-home:delegated'
-            #- '${MEDIAINCOMPLETEDIRECTORY}/incomplete:/data/incomplete:delegated'
-            - '${MEDIACOMPLETEDIRECTORY}/completed:/data/completed:delegated'
-            - '${MEDIACOMPLETEDIRECTORY}/transmission-home:/data/transmission-home:delegated'
-            - '${MEDIACOMPLETEDIRECTORY}/incomplete:/data/incomplete:delegated'
+            - '${MEDIACOMPLETEDIRECTORY}/completed:/data/completed'
+            - '${CONFIGDIRECTORY}/transmission:/data/transmission-home:cached'
+            - '${MEDIAINCOMPLETEDIRECTORY}/incomplete-transmission:/data/incomplete'
 
     # ----------------------------------------
     # SABNZBD
@@ -139,7 +143,7 @@ services:
         volumes:
             - '${CONFIGDIRECTORY}/sabnzbd:/config'
             - '${MEDIACOMPLETEDIRECTORY}/completed:/downloads'
-            - '${MEDIACOMPLETEDIRECTORY}/incomplete:/incomplete-downloads'
+            - '${MEDIAINCOMPLETEDIRECTORY}/incomplete-sab:/incomplete-downloads'
         ports:
             - 8081:8080
 
@@ -158,7 +162,7 @@ services:
             - PGID=${PGID}
         volumes:
             - '${CONFIGDIRECTORY}/duplicati:/config'
-            - '${MEDIACOMPLETEDIRECTORY}/config-backups:/backups'
+            - '${MEDIAINCOMPLETEDIRECTORY}/config-backups:/backups'
             - '${CONFIGDIRECTORY}:/source'
 
     # ----------------------------------------
@@ -200,16 +204,21 @@ services:
         image: linuxserver/nzbhydra2
         container_name: nzbhydra2
         restart: unless-stopped
+        ports:
+            - '5076:5076'
         environment:
             - PUID=${PUID}
             - PGID=${PGID}
             - TZ=${TZ}
+        healthcheck:
+            test: "curl --fail -L localhost:5076 || exit 1"
+            interval: "15s"
+            timeout: "5s"
+            start_period: "30s"
+            retries: 2
         volumes:
             - '${CONFIGDIRECTORY}/nzbhydra2:/config'
-        ports:
-            - '5076:5076'
-        depends_on:
-            - jackett
+
     # ----------------------------------------
     # MINIO
     # ----------------------------------------
@@ -333,7 +342,7 @@ services:
     # OMBI
     # ----------------------------------------
     ombi:
-        image: linuxserver/ombi
+        image: linuxserver/ombi:development
         container_name: ombi
         restart: unless-stopped
         cpus: 1.5
@@ -416,9 +425,12 @@ services:
             # https://github.com/NVIDIA/nvidia-docker
             # basically: install the latest drivers (ubuntu-drivers works), then nvidia-docker2 package,
             # then add these env vars, then restart docker and destroy / recreate the plex container
-            - NVIDIA_VISIBLE_DEVICES=all
-            - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
-        runtime: nvidia
+        #     - NVIDIA_VISIBLE_DEVICES=all
+        #     - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+        # runtime: nvidia
+        devices:
+            # For quicksync
+            - /dev/dri:/dev/dri
         volumes:
             - '${CONFIGDIRECTORY}/plex:/config'
             - '${CONFIGDIRECTORY}/plex/transcode:/transcode'
@@ -478,11 +490,19 @@ services:
             - TZ=${TZ}
         volumes:
             - '${CONFIGDIRECTORY}/radarr:/config'
-            - '${MEDIACOMPLETEDIRECTORY}/movies:/data/movies'
-            - '${MEDIACOMPLETEDIRECTORY}/completed:/data/completed'
+            # These completed and movies dir must be on the same bind mount for hardlinks to work
+            # - '${MEDIACOMPLETEDIRECTORY}/movies:/data/movies'
+            # - '${MEDIACOMPLETEDIRECTORY}/completed:/data/completed'
+            - '${MEDIACOMPLETEDIRECTORY}:/data'
         depends_on:
-            - jackett
-            - transmission
+            jackett:
+                condition: service_started
+            transmission:
+                condition: service_healthy
+            nzbhydra2:
+                condition: service_healthy
+            sabnzbd:
+                condition: service_started
 
     # ----------------------------------------
     # SICKRAGE
@@ -517,11 +537,19 @@ services:
             - TZ=${TZ}
         volumes:
             - '${CONFIGDIRECTORY}/sonarr:/config'
-            - '${MEDIACOMPLETEDIRECTORY}/tv:/data/tv'
-            - '${MEDIACOMPLETEDIRECTORY}/completed:/data/completed'
+            # These completed and tv dir must be on the same bind mount for hardlinks to work
+            # - '${MEDIACOMPLETEDIRECTORY}/tv:/data/tv'
+            # - '${MEDIACOMPLETEDIRECTORY}/completed:/data/completed'
+            - '${MEDIACOMPLETEDIRECTORY}:/data'
         depends_on:
-            - jackett
-            - transmission
+            jackett:
+                condition: service_started
+            transmission:
+                condition: service_healthy
+            nzbhydra2:
+                condition: service_healthy
+            sabnzbd:
+                condition: service_started
 
     # ----------------------------------------
     # BAZARR
@@ -584,7 +612,7 @@ services:
             context: ~/code/docker-nginx-rtmp
             dockerfile: Dockerfile
         container_name: nginx-rtmp
-        runtime: nvidia
+        # runtime: nvidia
         restart: unless-stopped
         cpus: 2
         ports:
@@ -596,8 +624,8 @@ services:
             - INCOMING_UDP_PORT=5005
             - IP_ADDRESS=${IP_ADDRESS}
             - HDHR_IP_ADDRESS=${HDHR_IP_ADDRESS}
-            - NVIDIA_VISIBLE_DEVICES=all
-            - NVIDIA_DRIVER_CAPABILITIES=all
+            # - NVIDIA_VISIBLE_DEVICES=all
+            # - NVIDIA_DRIVER_CAPABILITIES=all
             - TUNER_NUMBER=1
             - FLAG_PATH=/tmp/someoneIsWatching
             - TZ=${TZ}
@@ -623,6 +651,42 @@ services:
             - '3000'
         environment:
             - URL_FRAGMENT=${URL_FRAGMENT}
+
+    # ----------------------------------------
+    # XTEVE
+    # ----------------------------------------
+    xteve:
+        image: alturismo/xteve
+        container_name: xteve
+        restart: unless-stopped
+        ports:
+            - '34400:34400'
+        environment:
+            - TZ=${TZ}
+        healthcheck:
+            test: "curl --fail -L localhost:34400/web || exit 1"
+            interval: "15s"
+            timeout: "5s"
+            start_period: "30s"
+            retries: 2
+        volumes:
+            - '${CONFIGDIRECTORY}/xteve:/root/.xteve'
+            - '${CONFIGDIRECTORY}/xteve/_config:/config'
+
+    # ----------------------------------------
+    # SMOKEPING
+    # ----------------------------------------
+    smokeping:
+        image: ghcr.io/linuxserver/smokeping
+        container_name: smokeping
+        restart: unless-stopped
+        ports:
+            - '34500:80'
+        environment:
+            - TZ=${TZ}
+        volumes:
+            - '${CONFIGDIRECTORY}/smokeping/config:/config'
+            - '${CONFIGDIRECTORY}/smokeping/data:/data'
 
     # ----------------------------------------
     # TRAEFIK
@@ -671,3 +735,19 @@ services:
             - "traefik.http.routers.redirect-top-domain.entrypoints=https"
             - "traefik.http.routers.redirect-top-domain.middlewares=redirect-top-domain"
             - "traefik.http.routers.redirect-top-domain.tls.certresolver=leresolver"
+
+    # ----------------------------------------
+    # MINIO
+    # ----------------------------------------
+    minio:
+        image: minio/minio
+        container_name: minio
+        restart: unless-stopped
+        ports:
+            - '9000:9000'
+        user: $PUID:$PGID
+        command:
+            - 'server'
+            - '/data'
+        volumes:
+            - '${MEDIAINCOMPLETEDIRECTORY}/minio:/data'
