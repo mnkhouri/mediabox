@@ -14,6 +14,7 @@ fi
 
 body1=$(zfs list tank)
 body2=$(zpool status -v)
+body3=$(snapraid smart)
 
 mailHeader=$(cat <<EOF
     <html>
@@ -28,4 +29,4 @@ mailFooter=$(cat <<EOF
 EOF
 )
 
-echo -e "$mailHeader$body1\n\n$body2$mailFooter" | mail -a 'Content-Type: text/html' -s "$subject" yacoutamia@gmail.com
+echo -e "$mailHeader$body1\n\n$body2\n\n$body3$mailFooter" | mail -a 'Content-Type: text/html' -s "$subject" yacoutamia@gmail.com
