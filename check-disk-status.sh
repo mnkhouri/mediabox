@@ -2,6 +2,7 @@
 
 if [ "$(zpool status -x)" == "all pools are healthy" ]; then
     echo "ZFS status check good"
+    curl -m 10 --retry 5 https://hc-ping.com/5fe212a6-d384-4fe9-9698-7541885e7a06
     if [ "$(date +"%u")" != "6" ]; then
         echo "It's not weekend day, quitting"
         exit 0
