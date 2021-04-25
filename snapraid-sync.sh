@@ -44,8 +44,8 @@ EMAIL_ADDRESS="yacoutamia@gmail.com"
 # NOTE that depending on how active your filesystem is being used, a low
 # number here may result in your parity info being out of sync often and/or
 # you having to do lots of manual syncing.
-DEL_THRESHOLD=20
-UP_THRESHOLD=500
+DEL_THRESHOLD=50
+UP_THRESHOLD=2000
 
 # Set number of warnings before we force a sync job.
 # This option comes in handy when you cannot be bothered to manually
@@ -120,6 +120,7 @@ function main(){
   echo "SnapRAID Script Job started [`date`]"
   echo
   echo "----------------------------------------"
+  curl -m 10 --retry 5 https://hc-ping.com/0ef0cd5f-0911-4815-9d3c-caa7a64a2754/start
 
   # Remove any plex created anomolies
   echo "##Preprocessing"
@@ -391,7 +392,7 @@ function service_array_setup() {
 }
 
 function stop_services(){
-  for i in ${service_array[@]}; do
+  for i in "${service_array[@]}"; do
     echo "Pausing Service - ""${i^}";
     docker pause $i
     SERVICES_STOPPED=1
@@ -400,7 +401,7 @@ function stop_services(){
 
 function restore_services(){
   if [ $SERVICES_STOPPED -eq 1 ]; then
-    for i in ${service_array[@]}; do
+    for i in "${service_array[@]}"; do
       echo "Unpausing Service - ""${i^}";
       docker unpause $i
       SERVICES_STOPPED=0

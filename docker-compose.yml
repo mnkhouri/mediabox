@@ -74,7 +74,7 @@ services:
     # TRANSMISSION
     # ----------------------------------------
     transmission:
-        image: haugene/transmission-openvpn
+        image: haugene/transmission-openvpn:dev # temp 'dev' to workaround ufw issue 4/14/21
         container_name: transmission
         restart: unless-stopped
         cpus: 2
@@ -133,7 +133,7 @@ services:
     # SABNZBD
     # ----------------------------------------
     sabnzbd:
-        image: linuxserver/sabnzbd:unstable # remove the "unstable" tag once 3.0 is published https://github.com/sabnzbd/sabnzbd/releases
+        image: linuxserver/sabnzbd
         container_name: sabnzbd
         restart: unless-stopped
         environment:
@@ -746,8 +746,26 @@ services:
         ports:
             - '9000:9000'
         user: $PUID:$PGID
+        environment:
+            - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+            - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
         command:
             - 'server'
             - '/data'
         volumes:
             - '${MEDIAINCOMPLETEDIRECTORY}/minio:/data'
+
+    # ----------------------------------------
+    # RPDB (Ratings Poster DB)
+    # ----------------------------------------
+    rpdb:
+        image: jaruba/rpdb-folders-docker
+        container_name: rpdb
+        restart: unless-stopped
+        ports:
+            - '8750:8750'
+        user: $PUID:$PGID
+        volumes:
+            - '${CONFIGDIRECTORY}/rpdb:/rpdb/config'
+            - '${MEDIACOMPLETEDIRECTORY}/tv:/rpdb/mounts/tvshows'
+            - '${MEDIACOMPLETEDIRECTORY}/movies:/rpdb/mounts/movies'
