@@ -74,7 +74,7 @@ services:
     # TRANSMISSION
     # ----------------------------------------
     transmission:
-        image: haugene/transmission-openvpn:dev # temp 'dev' to workaround ufw issue 4/14/21
+        image: haugene/transmission-openvpn
         container_name: transmission
         restart: unless-stopped
         cpus: 2
@@ -589,20 +589,22 @@ services:
     # ----------------------------------------
     # IMDB RATING UPDATE TOOL
     # ----------------------------------------
-    imdbupdater:
-        image: mynttt/updatetool
-        container_name: imdbupdater
-        restart: unless-stopped
-        cpus: 1.5
-        environment:
-            # - TMDB_API_KEY=${TMDB_API_KEY}
-            # - TVDB_API_KEY=${TVDB_API_KEY}
-            - TZ=${TZ}
-        volumes:
-            - '${CONFIGDIRECTORY}/imdbupdater:/config'
-            - '${CONFIGDIRECTORY}/plex/Library/Application Support/Plex Media Server:/plexdata'
-        depends_on:
-            - plex
+    # NOTE: disabled as of 4/25/2021 -- this only has an effect when the rating source is set to
+    # IMDB, and I'm now using Rotten Tomatoes instead
+    # imdbupdater:
+    #     image: mynttt/updatetool
+    #     container_name: imdbupdater
+    #     restart: unless-stopped
+    #     cpus: 1.5
+    #     environment:
+    #         # - TMDB_API_KEY=${TMDB_API_KEY}
+    #         # - TVDB_API_KEY=${TVDB_API_KEY}
+    #         - TZ=${TZ}
+    #     volumes:
+    #         - '${CONFIGDIRECTORY}/imdbupdater:/config'
+    #         - '${CONFIGDIRECTORY}/plex/Library/Application Support/Plex Media Server:/plexdata'
+    #     depends_on:
+    #         - plex
 
     # ----------------------------------------
     # NGINX RTMP/HLS
@@ -692,7 +694,7 @@ services:
     # TRAEFIK
     # ----------------------------------------
     traefik:
-        image: traefik:v2.2
+        image: traefik
         container_name: traefik
         restart: unless-stopped
         ports:

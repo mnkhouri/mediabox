@@ -15,21 +15,26 @@ function update {
         echo "Please install yq first"
         exit 1
     fi
+
+    docker-compose -f "$COMPOSE_LOC" pull
+
+    rm "$VERSIONS_LOC"
     for i in $(docker-compose -f "$COMPOSE_LOC" config --services); do
         container_name=$(yq e ".services.${i}.container_name" "$COMPOSE_LOC")
         image_name=$(docker inspect --format='{{ index .Config.Image }}' "$container_name")
-        repo_digest=$(docker inspect --format='{{ index .RepoDigests 0 }}' "$(docker inspect --format='{{ .Image }}' "$container_name")")
-        if [ "$?" -ne 0 ]; then echo "Skipping version for $container_name"; fi
+        repo_digest=$(docker inspect --format='{{ index .RepoDigests 0 }}' "$(docker inspect --format='{{ .Image }}' "$container_name")" 2>&1)
+        if [ "$?" -ne 0 ]; then echo "Skipping version for $container_name"; continue; fi
         echo "$container_name,$image_name,$repo_digest" >> "$VERSIONS_LOC"
+        latest_digest=$(docker image inspect --format='{{ index .RepoDigests 0 }}' "$image_name")
+        if [ "$latest_digest" != "$repo_digest" ]; then
+            echo "New version available for $container_name"
+        fi
     done
 
-    docker-compose -f "$COMPOSE_LOC" pull
-    cp -a "$COMPOSE_LOC" "$APPDATA_LOC"/docker-compose.yml.bak
-    #backup_data
-
     confirm "Want to update?" || exit 0
-    #docker-compose -f "$COMPOSE_LOC" up -d
-
+    #backup_data
+    cp -a "$COMPOSE_LOC" "$APPDATA_LOC"/docker-compose.yml.bak
+    docker-compose -f "$COMPOSE_LOC" up -d
     docker image prune -f
 }
 
