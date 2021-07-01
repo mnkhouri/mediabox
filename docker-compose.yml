@@ -342,7 +342,7 @@ services:
     # OMBI
     # ----------------------------------------
     ombi:
-        image: linuxserver/ombi:development
+        image: linuxserver/ombi
         container_name: ombi
         restart: unless-stopped
         cpus: 1.5
@@ -746,7 +746,7 @@ services:
         container_name: minio
         restart: unless-stopped
         ports:
-            - '9000:9000'
+            - '19909:9000'
         user: $PUID:$PGID
         environment:
             - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}

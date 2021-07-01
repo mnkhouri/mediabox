@@ -44,7 +44,7 @@ EMAIL_ADDRESS="yacoutamia@gmail.com"
 # NOTE that depending on how active your filesystem is being used, a low
 # number here may result in your parity info being out of sync often and/or
 # you having to do lots of manual syncing.
-DEL_THRESHOLD=50
+DEL_THRESHOLD=500
 UP_THRESHOLD=2000
 
 # Set number of warnings before we force a sync job.
