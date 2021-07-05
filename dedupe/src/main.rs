@@ -2,13 +2,17 @@
 use {
     anyhow::Error,
     blake2::{Blake2b, Digest},
+    dialoguer::{theme::ColorfulTheme, Select},
+    indicatif::{ProgressBar, ProgressStyle},
     lazy_static::lazy_static,
-    log::{debug, info, trace, warn},
+    log::{debug, error, info, trace, warn},
     question::{Answer, Question},
     regex::Regex,
     std::{
         collections::HashMap,
+        convert::TryInto as _,
         fs, io,
+        io::Read as _,
         path::{Path, PathBuf},
     },
     structopt::StructOpt,
@@ -22,14 +26,6 @@ struct Opt {
     /// Verbose mode (-v, -vv, -vvv, -vvvv)
     #[structopt(short, long, parse(from_occurrences))]
     verbose: usize,
-
-    /// Perform hard links (if not present, will do a dry-run)
-    #[structopt(long)]
-    hardlink: bool,
-
-    /// Hash uncertain files (if not present, will skip these files)
-    #[structopt(long)]
-    hash: bool,
 
     /// Minimum filesize in MB
     #[structopt(short, long, required = true)]
@@ -48,13 +44,20 @@ fn main() {
         .timestamp(stderrlog::Timestamp::Off)
         .init()
         .unwrap();
-    ensure_conflicts_are_stopped().unwrap();
 
+    println!("Walking directories to find all filesizes");
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("[{elapsed_precise}] {spinner} {wide_msg}")
+            .progress_chars("#>-"),
+    );
     let mut filesize_map: HashMap<u64, Vec<DirEntry>> = HashMap::new();
     let mut total_file_count = 0;
     for dir in opt.directories {
         let files = walk_directory(dir, opt.min_filesize_mb);
         for file in files {
+            spinner.set_message(format!("{}", file.path().display()));
             total_file_count += 1;
             let len = file.metadata().unwrap().len();
             let map_entry = filesize_map.entry(len).or_insert_with(|| vec![]);
@@ -67,42 +70,173 @@ fn main() {
             map_entry.push(file);
         }
     }
+    spinner.finish_with_message(format!(
+        "Found files with {} different sizes",
+        filesize_map.len()
+    ));
 
+    println!("Filtering out irrelevant filesizes");
+    let progress_bar = ProgressBar::new(filesize_map.len().try_into().unwrap());
+    progress_bar.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] [{bar:.cyan/blue}] {pos}/{len} ({eta}) {wide_msg}")
+            .progress_chars("#>-"),
+    );
     let mut total_dupe_size = 0;
-    let duplicate_sizes = filesize_map.into_iter().filter_map(|(filesize, files)| {
-        if files.len() < 2 {
-            return None;
-        }
-        if files.windows(2).all(|w| w[0].ino() == w[1].ino()) {
-            debug!(
-                "All entries for filesize {:.0} MB have inode {}",
-                filesize / 1024 / 1024,
-                files[0].ino()
-            );
-            return None;
-        }
-        total_dupe_size += filesize;
-        Some(files)
-    });
-
-    for files in duplicate_sizes {
-        if let Ok(_is_duplicate) = verify_duplicate(&files, opt.hash) {
-            if opt.hardlink {
-                hardlink(
-                    files
-                        .into_iter()
-                        .map(move |f| f.path().to_path_buf())
-                        .collect(),
+    let duplicate_sizes = filesize_map
+        .into_iter()
+        .filter_map(|(filesize, files)| {
+            progress_bar.inc(1);
+            if files.len() < 2 {
+                return None;
+            }
+            if files.windows(2).all(|w| w[0].ino() == w[1].ino()) {
+                debug!(
+                    "All entries for filesize {:.0} MB have inode {}",
+                    filesize / 1024 / 1024,
+                    files[0].ino()
                 );
-            } else {
-                info!("Likely duplicates: ");
-                for file in files {
+                return None;
+            }
+            total_dupe_size += filesize;
+            Some(files)
+        })
+        .collect::<Vec<Vec<DirEntry>>>();
+
+    progress_bar.finish_with_message(format!(
+        "{} filesizes have more than 1 file",
+        duplicate_sizes.len()
+    ));
+
+    let mut files_to_hardlink = vec![];
+    let mut files_for_manual_confirmation = vec![];
+
+    println!("Examining files for duplicates");
+    let progress_bar = ProgressBar::new(duplicate_sizes.len().try_into().unwrap());
+    progress_bar.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] [{bar:.cyan/blue}] {pos}/{len} ({eta}) {wide_msg}")
+            .progress_chars("#>-"),
+    );
+    for files in duplicate_sizes {
+        progress_bar.inc(1);
+        progress_bar.set_message(format!("{}", files[0].path().display()));
+        match verify_duplicate(&files) {
+            IsDuplicate::No => info!("Skipping dedupe due to file mismatch"),
+            IsDuplicate::VeryLikely => {
+                info!("Very likely duplicates: ");
+                for file in files.iter() {
                     info!("\t{}", file.path().display());
                 }
+                files_to_hardlink.push(files);
             }
-        } else {
-            info!("Skipping dedupe due to file mismatch");
+            IsDuplicate::Maybe => {
+                info!("Maybe duplicates: ");
+                for file in files.iter() {
+                    info!("\t{}", file.path().display());
+                }
+                files_for_manual_confirmation.push(files);
+            }
         }
+    }
+    progress_bar.finish_with_message(format!(
+        "Very likely duplicates: {}; Questionable duplicates: {}",
+        files_to_hardlink.len(),
+        files_for_manual_confirmation.len()
+    ));
+
+    let mut files_to_hash = vec![];
+    let mut idx = 0;
+    let len = files_for_manual_confirmation.len();
+    for files in files_for_manual_confirmation {
+        println!(
+            "What do you want to do with these potential duplicates? ({} / {})",
+            idx, len
+        );
+        idx += 1;
+        for file in files.iter() {
+            println!("\t{}", file.path().display());
+        }
+
+        let options = vec!["skip", "hash", "mark as dupe"];
+        let selection = match Select::with_theme(&ColorfulTheme::default())
+            .items(&options)
+            .default(0)
+            .interact_opt()
+        {
+            Ok(sel) => sel,
+            Err(e) => {
+                error!("Error getting input: {:?}", e);
+                continue;
+            }
+        };
+        match selection {
+            Some(index) => match options[index] {
+                "skip" => {}
+                "hash" => files_to_hash.push(files),
+                "mark as dupe" => files_to_hardlink.push(files),
+                _ => error!("Unexpected input"),
+            },
+            None => println!("User did not select anything, skipping"),
+        }
+    }
+
+    println!("Calculating hashes for requested files");
+    let progress_bar = ProgressBar::new(files_to_hash.len().try_into().unwrap());
+    progress_bar.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] [{bar:.cyan/blue}] {pos}/{len} ({eta}) {wide_msg}")
+            .progress_chars("#>-"),
+    );
+    for files in files_to_hash {
+        progress_bar.set_message(format!("{}", files[0].path().display()));
+        info!("Calculating hashes for:");
+        for file in files.iter() {
+            info!("\t{}", file.path().display());
+        }
+        let all_hashes_match = files
+            .windows(2)
+            .all(|w| full_hashes_match(w[0].path(), w[1].path()));
+        if all_hashes_match {
+            files_to_hardlink.push(files);
+        } else {
+            warn!("Hashes differ!");
+            progress_bar.println(format!("Hashes differed for {}", files[0].path().display()));
+            for file in files.iter() {
+                warn!("\t{}", file.path().display());
+            }
+        }
+        progress_bar.inc(1);
+    }
+    progress_bar.finish_with_message(format!("Finished hashing files"));
+
+    let answer = Question::new(&format!(
+        "Are all writing programs stopped? Do you want to hardlink {} files?",
+        files_to_hardlink.len()
+    ))
+    .yes_no()
+    .until_acceptable()
+    .confirm();
+
+    if answer == Answer::YES {
+        println!("Applying hardlinks");
+        let progress_bar = ProgressBar::new(files_to_hardlink.len().try_into().unwrap());
+        progress_bar.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] [{bar:.cyan/blue}] {pos}/{len} ({eta}) {wide_msg}")
+                .progress_chars("#>-"),
+        );
+        for files in files_to_hardlink {
+            progress_bar.inc(1);
+            progress_bar.set_message(format!("{}", files[0].path().display()));
+            hardlink(
+                files
+                    .into_iter()
+                    .map(move |f| f.path().to_path_buf())
+                    .collect(),
+            );
+        }
+        progress_bar.finish_with_message(format!("Finished hardlinking files"));
     }
 
     println!("Total files scanned: {}", total_file_count);
@@ -129,98 +263,117 @@ fn is_paw_patrol_bar_rescue(path: &Path) -> bool {
     }
     RE.is_match(path.file_stem().unwrap().to_str().unwrap())
 }
-
-fn ensure_conflicts_are_stopped() -> Result<(), &'static str> {
-    let answer = Question::new("Are all writing programs stopped?")
-        .default(Answer::NO)
-        .show_defaults()
-        .confirm();
-
-    if answer == Answer::YES {
-        Ok(())
-    } else {
-        Err("Stop all programs before continuing")
-    }
+enum IsDuplicate {
+    VeryLikely,
+    Maybe,
+    No,
 }
 
-fn verify_duplicate(files: &[DirEntry], do_expensive_check: bool) -> Result<(), ()> {
-    let mut danger = false;
+fn verify_duplicate(files: &[DirEntry]) -> IsDuplicate {
+    let mut guessed_metadata_differs = false;
 
     if let Some(_air_date) = generate_probable_air_date(files[0].path()) {
         let all_dates_match = files.windows(2).all(|w| {
             generate_probable_air_date(w[0].path()) == generate_probable_air_date(w[1].path())
         });
         if !all_dates_match {
-            warn!("Differing air dates guessed!");
+            debug!("Differing air dates guessed!");
             for file in files {
-                warn!("\t{:?}", generate_probable_air_date(file.path()));
-                warn!("\t\t{}", file.path().display());
+                debug!("\t{:?}", generate_probable_air_date(file.path()));
+                debug!("\t\t{}", file.path().display());
             }
-            danger = true;
+            guessed_metadata_differs = true;
         }
     } else if let Some(_episode) = generate_probable_episode(files[0].path()) {
         let all_episodes_match = files.windows(2).all(|w| {
             generate_probable_episode(w[0].path()) == generate_probable_episode(w[1].path())
         });
         if (!all_episodes_match) && files.iter().all(|w| !is_paw_patrol_bar_rescue(w.path())) {
-            warn!("Differing episodes guessed!");
+            debug!("Differing episodes guessed!");
             for file in files {
-                warn!("\t{:?}", generate_probable_episode(file.path()));
-                warn!("\t\t{:?}", file.path().display());
+                debug!("\t{:?}", generate_probable_episode(file.path()));
+                debug!("\t\t{:?}", file.path().display());
             }
-            danger = true;
+            guessed_metadata_differs = true;
         }
     } else {
         let all_titles_match = files
             .windows(2)
             .all(|w| generate_probable_name(w[0].path()) == generate_probable_name(w[1].path()));
         if !all_titles_match {
-            warn!("Differing titles guessed!");
+            debug!("Differing titles guessed!");
             for file in files {
-                warn!("\t{}", generate_probable_name(file.path()));
-                warn!("\t\t{}", file.path().display());
+                debug!("\t{}", generate_probable_name(file.path()));
+                debug!("\t\t{}", file.path().display());
             }
-            danger = true;
+            guessed_metadata_differs = true;
         }
     }
 
     if files.len() > 2 {
-        warn!("More than 2 files at this size!");
+        debug!("More than 2 files at this size!");
         for file in files {
-            warn!("\t\t{}", file.path().display());
+            debug!("\t\t{}", file.path().display());
         }
-        danger = true;
     }
 
-    // If we have danger, check the hash
-    if danger {
-        if !do_expensive_check {
-            return Err(());
-        }
-        warn!("Need to calculate hash:");
-        let all_hashes_match = files.windows(2).all(|w| {
-            if let Ok(hash1) = generate_hash(w[0].path()) {
-                if let Ok(hash2) = generate_hash(w[1].path()) {
-                    return hash1 == hash2;
+    // Always check the partial hashes, it's cheap
+    match files
+        .windows(2)
+        .all(|w| partial_hashes_match(w[0].path(), w[1].path()))
+    {
+        true => match guessed_metadata_differs {
+            true => IsDuplicate::Maybe,
+            false => IsDuplicate::VeryLikely,
+        },
+        false => {
+            if !guessed_metadata_differs {
+                warn!("Didn't detect differing titles");
+                for file in files {
+                    warn!("\t\t{}", file.path().display());
                 }
             }
-            false
-        });
-        if !all_hashes_match {
-            warn!("Hashes differ!");
-            return Err(());
+            IsDuplicate::No
         }
     }
-
-    Ok(())
 }
 
-fn generate_hash(path: &Path) -> Result<Vec<u8>, Error> {
-    let mut file = fs::File::open(&path)?;
+fn partial_hashes_match(path1: &Path, path2: &Path) -> bool {
+    if let Ok(partial_hash1) = generate_partial_hash(path1) {
+        if let Ok(partial_hash2) = generate_partial_hash(path2) {
+            return partial_hash1 == partial_hash2;
+        }
+    }
+    return false;
+}
+
+fn full_hashes_match(path1: &Path, path2: &Path) -> bool {
+    if let Ok(hash1) = generate_full_hash(path1) {
+        if let Ok(hash2) = generate_full_hash(path2) {
+            return hash1 == hash2;
+        }
+    }
+    return false;
+}
+
+fn generate_hash(mut reader: &mut impl io::Read) -> Result<Vec<u8>, Error> {
     let mut hasher = Blake2b::new();
-    let _n = io::copy(&mut file, &mut hasher)?;
+    let _n = io::copy(&mut reader, &mut hasher)?;
     let hash = hasher.result();
     Ok(hash.to_vec())
+}
+
+fn generate_partial_hash(path: &Path) -> Result<Vec<u8>, Error> {
+    const ONE_MEGABYTE: usize = 1024 * 1024;
+    let mut file = fs::File::open(&path)?;
+    let mut buffer = vec![0; ONE_MEGABYTE * 1];
+    file.read(&mut buffer)?;
+    generate_hash(&mut &buffer[..])
+}
+
+fn generate_full_hash(path: &Path) -> Result<Vec<u8>, Error> {
+    let mut file = fs::File::open(&path)?;
+    generate_hash(&mut file)
 }
 
 fn generate_probable_name(path: &Path) -> String {
