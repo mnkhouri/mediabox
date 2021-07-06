@@ -146,6 +146,10 @@ fn main() {
     ));
 
     let mut files_to_hash = vec![];
+    enum HashAmount {
+        Full,
+        HundredMB,
+    }
     let mut idx = 0;
     let len = files_for_manual_confirmation.len();
     for files in files_for_manual_confirmation {
@@ -158,7 +162,7 @@ fn main() {
             println!("\t{}", file.path().display());
         }
 
-        let options = vec!["skip", "hash", "mark as dupe"];
+        let options = vec!["skip", "hash 100MB", "hash full", "mark as dupe"];
         let selection = match Select::with_theme(&ColorfulTheme::default())
             .items(&options)
             .default(0)
@@ -173,7 +177,8 @@ fn main() {
         match selection {
             Some(index) => match options[index] {
                 "skip" => {}
-                "hash" => files_to_hash.push(files),
+                "hash 100MB" => files_to_hash.push((HashAmount::HundredMB, files)),
+                "hash full" => files_to_hash.push((HashAmount::Full, files)),
                 "mark as dupe" => files_to_hardlink.push(files),
                 _ => error!("Unexpected input"),
             },
@@ -181,22 +186,30 @@ fn main() {
         }
     }
 
-    println!("Calculating hashes for requested files");
+    println!("Calculating partial hashes for requested files");
     let progress_bar = ProgressBar::new(files_to_hash.len().try_into().unwrap());
     progress_bar.set_style(
         ProgressStyle::default_bar()
             .template("[{elapsed_precise}] [{bar:.cyan/blue}] {pos}/{len} ({eta}) {wide_msg}")
             .progress_chars("#>-"),
     );
-    for files in files_to_hash {
-        progress_bar.set_message(format!("{}", files[0].path().display()));
+    for (hash_amt, files) in files_to_hash {
+        progress_bar.set_message(format!(
+            "{}: {}",
+            match hash_amt {
+                HashAmount::Full => "full hash",
+                HashAmount::HundredMB => "first 100MB",
+            },
+            files[0].path().display()
+        ));
         info!("Calculating hashes for:");
         for file in files.iter() {
             info!("\t{}", file.path().display());
         }
-        let all_hashes_match = files
-            .windows(2)
-            .all(|w| full_hashes_match(w[0].path(), w[1].path()));
+        let all_hashes_match = files.windows(2).all(|w| match hash_amt {
+            HashAmount::Full => full_hashes_match(w[0].path(), w[1].path()),
+            HashAmount::HundredMB => partial_hashes_match(w[0].path(), w[1].path(), 100),
+        });
         if all_hashes_match {
             files_to_hardlink.push(files);
         } else {
@@ -317,15 +330,25 @@ fn verify_duplicate(files: &[DirEntry]) -> IsDuplicate {
         }
     }
 
-    // Always check the partial hashes, it's cheap
+    // Always check the partial hashes for 1MB, it's cheap
     match files
         .windows(2)
-        .all(|w| partial_hashes_match(w[0].path(), w[1].path()))
+        .all(|w| partial_hashes_match(w[0].path(), w[1].path(), 1))
     {
-        true => match guessed_metadata_differs {
-            true => IsDuplicate::Maybe,
-            false => IsDuplicate::VeryLikely,
-        },
+        true => {
+            if guessed_metadata_differs {
+                // Check the first 10MB, that should get us past any false positive
+                match files
+                    .windows(2)
+                    .all(|w| partial_hashes_match(w[0].path(), w[1].path(), 10))
+                {
+                    true => IsDuplicate::Maybe,
+                    false => IsDuplicate::No,
+                }
+            } else {
+                IsDuplicate::VeryLikely
+            }
+        }
         false => {
             if !guessed_metadata_differs {
                 warn!("Didn't detect differing titles");
@@ -338,9 +361,9 @@ fn verify_duplicate(files: &[DirEntry]) -> IsDuplicate {
     }
 }
 
-fn partial_hashes_match(path1: &Path, path2: &Path) -> bool {
-    if let Ok(partial_hash1) = generate_partial_hash(path1) {
-        if let Ok(partial_hash2) = generate_partial_hash(path2) {
+fn partial_hashes_match(path1: &Path, path2: &Path, megabytes: usize) -> bool {
+    if let Ok(partial_hash1) = generate_partial_hash(path1, megabytes) {
+        if let Ok(partial_hash2) = generate_partial_hash(path2, megabytes) {
             return partial_hash1 == partial_hash2;
         }
     }
@@ -363,10 +386,10 @@ fn generate_hash(mut reader: &mut impl io::Read) -> Result<Vec<u8>, Error> {
     Ok(hash.to_vec())
 }
 
-fn generate_partial_hash(path: &Path) -> Result<Vec<u8>, Error> {
+fn generate_partial_hash(path: &Path, megabytes: usize) -> Result<Vec<u8>, Error> {
     const ONE_MEGABYTE: usize = 1024 * 1024;
     let mut file = fs::File::open(&path)?;
-    let mut buffer = vec![0; ONE_MEGABYTE * 1];
+    let mut buffer = vec![0; ONE_MEGABYTE * megabytes];
     file.read(&mut buffer)?;
     generate_hash(&mut &buffer[..])
 }
