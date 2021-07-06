@@ -99,25 +99,25 @@ function main(){
   PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
   # Determine names of first content file...
-  CONTENT_FILE=`grep -v '^$\|^\s*\#' /etc/snapraid.conf | grep snapraid.content | head -n 1 | cut -d " " -f2`
+  CONTENT_FILE=$(grep -v '^$\|^\s*\#' /etc/snapraid.conf | grep snapraid.content | head -n 1 | cut -d " " -f2)
 
   # Build an array of parity all files...
-  PARITY_FILES[0]=`cat /etc/snapraid.conf | grep "^[^#;]" | grep parity | head -n 1 | cut -d " " -f 2 | cut -d "," -f 1`
-  PARITY_FILES[1]=`cat /etc/snapraid.conf | grep "^[^#;]" | grep 2-parity | head -n 1 | cut -d " " -f 2 | cut -d "," -f 2`
-  #PARITY_FILES[2]=`cat /etc/snapraid.conf | grep "^[^#;]" | grep parity | head -n 1 | cut -d " " -f 2 | cut -d "," -f 1`
-  #PARITY_FILES[3]=`cat /etc/snapraid.conf | grep "^[^#;]" | grep 2-parity | head -n 1 | cut -d " " -f 2 | cut -d "," -f 2`
-  #IFS=$'\n' PARITY_FILES=(`cat /etc/snapraid.conf | grep "^[^#;]" | grep "^\([2-6z]-\)*parity" | cut -d " " -f 2 | tr ',' '\n'`)
+  PARITY_FILES[0]=$(cat /etc/snapraid.conf | grep "^[^#;]" | grep parity | head -n 1 | cut -d " " -f 2 | cut -d "," -f 1)
+  PARITY_FILES[1]=$(cat /etc/snapraid.conf | grep "^[^#;]" | grep 2-parity | head -n 1 | cut -d " " -f 2 | cut -d "," -f 2)
+  #PARITY_FILES[2]=$(cat /etc/snapraid.conf | grep "^[^#;]" | grep parity | head -n 1 | cut -d " " -f 2 | cut -d "," -f 1)
+  #PARITY_FILES[3]=$(cat /etc/snapraid.conf | grep "^[^#;]" | grep 2-parity | head -n 1 | cut -d " " -f 2 | cut -d "," -f 2)
+  #IFS=$'\n' PARITY_FILES=($(cat /etc/snapraid.conf | grep "^[^#;]" | grep "^\([2-6z]-\)*parity" | cut -d " " -f 2 | tr ',' '\n'))
 
 ##### USER CONFIGURATION STOP ##### MAKE NO CHANGES BELOW THIS LINE ####
 
   # create tmp file for output
-  > $TMP_OUTPUT
+  true > $TMP_OUTPUT
 
   # Redirect all output to file and screen. Starts a tee process
   output_to_file_screen
 
   # timestamp the job
-  echo "SnapRAID Script Job started [`date`]"
+  echo "SnapRAID Script Job started [$(date)]"
   echo
   echo "----------------------------------------"
   curl -m 10 --retry 5 https://hc-ping.com/0ef0cd5f-0911-4815-9d3c-caa7a64a2754/start
@@ -127,7 +127,7 @@ function main(){
 
   # Stop any services that may inhibit optimum execution
   if [ $MANAGE_SERVICES -eq 1 ]; then
-    echo "###Stop Services [`date`]"
+    echo "###Stop Services [$(date)]"
     stop_services
   fi
 
@@ -142,23 +142,23 @@ function main(){
   chk_zero
 
   # run the snapraid DIFF command
-  echo "###SnapRAID DIFF [`date`]"
+  echo "###SnapRAID DIFF [$(date)]"
   $SNAPRAID_BIN diff
   # wait for the above cmd to finish, save output and open new redirect
   close_output_and_wait
   output_to_file_screen
   echo
-  echo "DIFF finished [`date`]"
+  echo "DIFF finished [$(date)]"
   JOBS_DONE="DIFF"
 
   # Get number of deleted, updated, and modified files...
   get_counts
 
   # sanity check to make sure that we were able to get our counts from the output of the DIFF job
-  if [ -z "$DEL_COUNT" -o -z "$ADD_COUNT" -o -z "$MOVE_COUNT" -o -z "$COPY_COUNT" -o -z "$UPDATE_COUNT" ]; then
+  if [ -z "$DEL_COUNT" ] || [ -z "$ADD_COUNT" ] || [ -z "$MOVE_COUNT" ] || [ -z "$COPY_COUNT" ] || [ -z "$UPDATE_COUNT" ]; then
     # failed to get one or more of the count values, lets report to user and exit with error code
     echo "**ERROR** - failed to get one or more count values. Unable to proceed."
-    echo "Exiting script. [`date`]"
+    echo "Exiting script. [$(date)]"
     if [ $EMAIL_ADDRESS ]; then
       SUBJECT="$EMAIL_SUBJECT_PREFIX WARNING - Unable to proceed with SYNC/SCRUB job(s). Check DIFF job output."
       send_mail
@@ -171,7 +171,7 @@ function main(){
 
   # check if the conditions to run SYNC are met
   # CHK 1 - if files have changed
-  if [ $DEL_COUNT -gt 0 -o $ADD_COUNT -gt 0 -o $MOVE_COUNT -gt 0 -o $COPY_COUNT -gt 0 -o $UPDATE_COUNT -gt 0 ]; then
+  if [ $DEL_COUNT -gt 0 ] || [ $ADD_COUNT -gt 0 ] || [ $MOVE_COUNT -gt 0 ] || [ $COPY_COUNT -gt 0 ] || [ $UPDATE_COUNT -gt 0 ]; then
     chk_del
 
     if [ $CHK_FAIL -eq 0 ]; then
@@ -183,18 +183,18 @@ function main(){
     fi
   else
     # NO, so let's skip SYNC
-    echo "No change detected. Not running SYNC job. [`date`] "
+    echo "No change detected. Not running SYNC job. [$(date)] "
     DO_SYNC=0
   fi
 
   # Now run sync if conditions are met
   if [ $DO_SYNC -eq 1 ]; then
-    echo "###SnapRAID SYNC [`date`]"
+    echo "###SnapRAID SYNC [$(date)]"
     $SNAPRAID_BIN sync -q
     #wait for the job to finish
     close_output_and_wait
     output_to_file_screen
-    echo "SYNC finished [`date`]"
+    echo "SYNC finished [$(date)]"
     JOBS_DONE="$JOBS_DONE + SYNC"
     # insert SYNC marker to 'Everything OK' or 'Nothing to do' string to differentiate it from SCRUB job later
     sed_me "s/^Everything OK/SYNC_JOB--Everything OK/g;s/^Nothing to do/SYNC_JOB--Nothing to do/g" "$TMP_OUTPUT"
@@ -209,23 +209,23 @@ function main(){
   # Moving onto scrub now. Check if user has enabled scrub
   if [ $SCRUB_PERCENT -gt 0 ]; then
     # YES, first let's check if delete threshold has been breached and we have not forced a sync.
-    if [ $CHK_FAIL -eq 1 -a $DO_SYNC -eq 0 ]; then
+    if [ $CHK_FAIL -eq 1 ] && [ $DO_SYNC -eq 0 ]; then
       # YES, parity is out of sync so let's not run scrub job
-      echo "Scrub job cancelled as parity info is out of sync (deleted or changed files threshold has been breached). [`date`]"
+      echo "Scrub job cancelled as parity info is out of sync (deleted or changed files threshold has been breached). [$(date)]"
     else
       # NO, delete threshold has not been breached OR we forced a sync, but we have one last test -
       # let's make sure if sync ran, it completed successfully (by checking for our marker text "SYNC_JOB--" in the output).
-      if [ $DO_SYNC -eq 1 -a -z "$(grep -w "SYNC_JOB-" $TMP_OUTPUT)" ]; then
+      if [ $DO_SYNC -eq 1 ] && ! (grep -qw "SYNC_JOB-" $TMP_OUTPUT); then
         # Sync ran but did not complete successfully so lets not run scrub to be safe
-        echo "**WARNING** - check output of SYNC job. Could not detect marker . Not proceeding with SCRUB job. [`date`]"
+        echo "**WARNING** - check output of SYNC job. Could not detect marker . Not proceeding with SCRUB job. [$(date)]"
       else
         # Everything ok - let's run the scrub job!
-        echo "###SnapRAID SCRUB [`date`]"
+        echo "###SnapRAID SCRUB [$(date)]"
         $SNAPRAID_BIN scrub -p $SCRUB_PERCENT -o $SCRUB_AGE -q
         #wait for the job to finish
         close_output_and_wait
         output_to_file_screen
-        echo "SCRUB finished [`date`]"
+        echo "SCRUB finished [$(date)]"
         echo
         JOBS_DONE="$JOBS_DONE + SCRUB"
         # insert SCRUB marker to 'Everything OK' or 'Nothing to do' string to differentiate it from SYNC job above
@@ -235,7 +235,7 @@ function main(){
       fi
     fi
   else
-    echo "Scrub job is not enabled. Not running SCRUB job. [`date`] "
+    echo "Scrub job is not enabled. Not running SCRUB job. [$(date)] "
   fi
 
   echo
@@ -258,11 +258,11 @@ function main(){
     restore_services
   fi
 
-  echo "All jobs ended. [`date`] "
+  echo "All jobs ended. [$(date)] "
 
   # all jobs done, let's send output to user if configured
   if [ $EMAIL_ADDRESS ]; then
-    echo -e "Email address is set. Sending email report to **$EMAIL_ADDRESS** [`date`]"
+    echo -e "Email address is set. Sending email report to **$EMAIL_ADDRESS** [$(date)]"
     # check if deleted count exceeded threshold
     prepare_mail
 
@@ -294,7 +294,7 @@ function sanity_check() {
   for i in "${PARITY_FILES[@]}"
     do
       if [ ! -e $i ]; then
-        echo "[`date`] ERROR - Parity file ($i) not found!"
+        echo "[$(date)] ERROR - Parity file ($i) not found!"
         echo "ERROR - Parity file ($i) not found!" >> $TMP_OUTPUT
         exit 1;
       fi
@@ -343,40 +343,40 @@ function chk_updated(){
 
 function chk_sync_warn(){
   if [ $SYNC_WARN_THRESHOLD -gt -1 ]; then
-    echo "Forced sync is enabled. [`date`]"
+    echo "Forced sync is enabled. [$(date)]"
 
     SYNC_WARN_COUNT=$(sed 'q;/^[0-9][0-9]*$/!d' $SYNC_WARN_FILE 2>/dev/null)
     SYNC_WARN_COUNT=${SYNC_WARN_COUNT:-0} #value is zero if file does not exist or does not contain what we are expecting
 
     if [ $SYNC_WARN_COUNT -ge $SYNC_WARN_THRESHOLD ]; then
       # YES, lets force a sync job. Do not need to remove warning marker here as it is automatically removed when the sync job is run by this script
-      echo "Number of warning(s) ($SYNC_WARN_COUNT) has reached/exceeded threshold ($SYNC_WARN_THRESHOLD). Forcing a SYNC job to run. [`date`]"
+      echo "Number of warning(s) ($SYNC_WARN_COUNT) has reached/exceeded threshold ($SYNC_WARN_THRESHOLD). Forcing a SYNC job to run. [$(date)]"
       DO_SYNC=1
     else
       # NO, so let's increment the warning count and skip the sync job
       ((SYNC_WARN_COUNT += 1))
       echo $SYNC_WARN_COUNT > $SYNC_WARN_FILE
-      echo "$((SYNC_WARN_THRESHOLD - SYNC_WARN_COUNT)) warning(s) till forced sync. NOT proceeding with SYNC job. [`date`]"
+      echo "$((SYNC_WARN_THRESHOLD - SYNC_WARN_COUNT)) warning(s) till forced sync. NOT proceeding with SYNC job. [$(date)]"
       DO_SYNC=0
     fi
   else
     # NO, so let's skip SYNC
-    echo "Forced sync is not enabled. Check $TMP_OUTPUT for details. NOT proceeding with SYNC job. [`date`]"
+    echo "Forced sync is not enabled. Check $TMP_OUTPUT for details. NOT proceeding with SYNC job. [$(date)]"
     DO_SYNC=0
   fi
 }
 
 function chk_zero(){
-  echo "###SnapRAID TOUCH [`date`]"
+  echo "###SnapRAID TOUCH [$(date)]"
   echo "Checking for zero sub-second files."
   TIMESTATUS=$($SNAPRAID_BIN status | grep 'You have [1-9][0-9]* files with zero sub-second timestamp\.' | sed 's/^You have/Found/g')
   if [ -n "$TIMESTATUS" ]; then
     echo "$TIMESTATUS"
-    echo "Running TOUCH job to timestamp. [`date`]"
+    echo "Running TOUCH job to timestamp. [$(date)]"
     $SNAPRAID_BIN touch
     close_output_and_wait
     output_to_file_screen
-    echo "TOUCH finished [`date`]"
+    echo "TOUCH finished [$(date)]"
   else
     echo "No zero sub-second timestamp files found."
   fi
@@ -411,7 +411,7 @@ function restore_services(){
 
 function clean_desc(){
   # Cleanup file descriptors
-  exec 1>&{out} 2>&{err}
+  exec >&$out 2>&$err
 
   # If interactive shell restore output
   [[ $- == *i* ]] && exec &>/dev/tty
@@ -419,23 +419,23 @@ function clean_desc(){
 
 function prepare_mail() {
   if [ $CHK_FAIL -eq 1 ]; then
-    if [ $DEL_COUNT -gt $DEL_THRESHOLD -a $DO_SYNC -eq 0 ]; then
+    if [ $DEL_COUNT -gt $DEL_THRESHOLD ] && [ $DO_SYNC -eq 0 ]; then
       MSG="Deleted Files ($DEL_COUNT) / ($DEL_THRESHOLD) Violation"
     fi
 
-    if [ $DEL_COUNT -gt $DEL_THRESHOLD -a $UPDATE_COUNT -gt $UP_THRESHOLD -a $DO_SYNC -eq 0 ]; then
+    if [ $DEL_COUNT -gt $DEL_THRESHOLD ] && [ $UPDATE_COUNT -gt $UP_THRESHOLD ] && [ $DO_SYNC -eq 0 ]; then
       MSG="$MSG & "
     fi
 
-    if [ $UPDATE_COUNT -gt $UP_THRESHOLD -a $DO_SYNC -eq 0 ]; then
+    if [ $UPDATE_COUNT -gt $UP_THRESHOLD ] && [ $DO_SYNC -eq 0 ]; then
       MSG="$MSG Changed Files ($UPDATE_COUNT) / ($UP_THRESHOLD) Violation"
     fi
 
     SUBJECT="[WARNING] $SYNC_WARN_COUNT - ($MSG) $EMAIL_SUBJECT_PREFIX"
-  elif [ -z "${JOBS_DONE##*"SYNC"*}" -a -z "$(grep -w "SYNC_JOB-" $TMP_OUTPUT)" ]; then
+  elif [ -z "${JOBS_DONE##*"SYNC"*}" ] &&  grep -wq "SYNC_JOB-" $TMP_OUTPUT; then
     # Sync ran but did not complete successfully so lets warn the user
     SUBJECT="[WARNING] SYNC job ran but did not complete successfully $EMAIL_SUBJECT_PREFIX"
-  elif [ -z "${JOBS_DONE##*"SCRUB"*}" -a -z "$(grep -w "SCRUB_JOB-" $TMP_OUTPUT)" ]; then
+  elif [ -z "${JOBS_DONE##*"SCRUB"*}" ] && grep -wq "SCRUB_JOB-" $TMP_OUTPUT; then
     # Scrub ran but did not complete successfully so lets warn the user
     SUBJECT="[WARNING] SCRUB job ran but did not complete successfully $EMAIL_SUBJECT_PREFIX"
   else
